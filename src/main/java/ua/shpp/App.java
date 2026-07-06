@@ -1,19 +1,35 @@
 package ua.shpp;
 
 import org.postgresql.ds.PGSimpleDataSource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import javax.sql.DataSource;
+import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.Objects;
 
 public class App {
     public static void main(String[] args) {
 //        databaseJDBCHelloWorld();
+        createTablesFromScript("schema.sql");
+
+        AppConfig config = AppConfig.load();
+        InputStream shopAddressesData = ResourceLoader.stream("shop_addresses.csv");
+        InputStream itemTypesData = ResourceLoader.stream("item_types.csv");
+        fillInTablesWithGeneration(config, shopAddressesData, itemTypesData);
+        findShopAdressWithTheBiggestCountOfItemsOfType(config.itemType());
+    }
+
+    private static void findShopAdressWithTheBiggestCountOfItemsOfType(String s) {
+    }
+
+    private static void fillInTablesWithGeneration(AppConfig config, InputStream shopAddressesData,
+                                                   InputStream itemTypesData) {
+
+    }
+
+    private static void createTablesFromScript(String filename) {
+        String initTablesScript = ResourceLoader.loadText(filename);
 
     }
 
