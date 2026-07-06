@@ -13,6 +13,11 @@ import java.util.Objects;
 
 public class App {
     public static void main(String[] args) {
+//        databaseJDBCHelloWorld();
+
+    }
+
+    private static void databaseJDBCHelloWorld() {
         final String url =
                 "jdbc:postgresql://localhost:5432/bird_encyclopedia?user=postgres&password=123";
         final PGSimpleDataSource dataSource = new PGSimpleDataSource();
@@ -34,3 +39,25 @@ public class App {
         }
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

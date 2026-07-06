@@ -1,8 +1,5 @@
 package ua.shpp;
 
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.util.Properties;
 
 public record AppConfig(
@@ -25,7 +22,7 @@ public record AppConfig(
     }
 
     public static AppConfig load() {
-        Properties properties = loadProperties();
+        Properties properties = ResourceLoader.readProperties("config.properties");
         return new AppConfig(
                 requiredString(properties, "db.url"),
                 requiredString(properties, "db.user"),
@@ -35,19 +32,6 @@ public record AppConfig(
                 requiredInt(properties, "batch.size"),
                 System.getProperty("itemType")
         );
-    }
-
-    private static Properties loadProperties() {
-        try (InputStreamReader reader = new InputStreamReader(
-                ResourceLoader.stream("config.properties"),
-                StandardCharsets.UTF_8
-        )) {
-            Properties properties = new Properties();
-            properties.load(reader);
-            return properties;
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to load config.properties", e);
-        }
     }
 
     private static String requiredString(Properties properties, String key) {
