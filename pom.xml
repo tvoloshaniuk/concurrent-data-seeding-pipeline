@@ -14,6 +14,11 @@
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>net.datafaker</groupId>
+            <artifactId>datafaker</artifactId>
+            <version>2.2.2</version>
+        </dependency>
         <!-- Logback Classic -->
         <dependency>
             <groupId>ch.qos.logback</groupId>

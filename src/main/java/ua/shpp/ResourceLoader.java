@@ -20,7 +20,7 @@ public final class ResourceLoader {
         return inputStream;
     }
 
-    public static String loadText(String fileName) {
+    public static String readText(String fileName) {
         try (InputStream inputStream = stream(fileName)) {
             return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {
