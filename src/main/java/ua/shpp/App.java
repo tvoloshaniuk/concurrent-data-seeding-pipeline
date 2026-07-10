@@ -21,36 +21,25 @@ public class App {
     private static final Logger log = LoggerFactory.getLogger(App.class);
 
     public static void main(String[] args) {
-        generateItemTypes();
 //        databaseJDBCHelloWorld();
 
-//        AppConfig config = AppConfig.load();
-//        DataSource dataSource = initDatasource(config);
-//        DbRepository dbRepository = new DbRepository(dataSource);
-//
-//        dbRepository.runDdl(ResourceLoader.readText("schema.sql"));
-//        try (
-//                InputStream shopAddresses = ResourceLoader.stream("shops.csv");
-//                InputStream itemTypes = ResourceLoader.stream("item_types.csv")
-//        ) {
+        AppConfig config = AppConfig.load(args);
+        DataSource dataSource = initDatasource(config);
+        DbRepository dbRepository = new DbRepository(dataSource);
+
+        dbRepository.runDdl(ResourceLoader.readText("schema.sql"));
+        try (
+                InputStream shopAddresses = ResourceLoader.stream("shops.csv");
+                InputStream itemTypes = ResourceLoader.stream("item_types.csv")
+        ) {
 //            DataPopulator populator = new DataPopulator(dbRepository, config);
 //            populator.fillInTables(shopAddresses, itemTypes);
-//        } catch (IOException e) {
-//            throw new RuntimeException(e);
-//        }
-//
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
 //        String topShop = dbRepository.findShopWithMaxItems(config.itemType());
 //        log.info("Top Shop: {}", topShop);
-    }
-
-    private static void generateItemTypes() {
-        Faker uaFaker = new Faker(new Locale("uk"));
-        String department = uaFaker.commerce().department();
-        String address = uaFaker.address().fullAddress();
-        for (int i = 1; i <= 5000; i++) {
-            // Згенерує: "Electronics-1", "Tools-2" // <--------------------
-            log.info(uaFaker.commerce().department() + "-" + i);
-        }
     }
 
     private static DataSource initDatasource(AppConfig config) {
