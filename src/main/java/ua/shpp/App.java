@@ -21,8 +21,6 @@ public class App {
     private static final Logger log = LoggerFactory.getLogger(App.class);
 
     public static void main(String[] args) {
-//        databaseJDBCHelloWorld();
-
         AppConfig config = AppConfig.load(args);
         DataSource dataSource = initDatasource(config);
         DbRepository dbRepository = new DbRepository(dataSource);
@@ -32,8 +30,8 @@ public class App {
                 InputStream shopAddresses = ResourceLoader.stream("shops.csv");
                 InputStream itemTypes = ResourceLoader.stream("item_types.csv")
         ) {
-//            DataPopulator populator = new DataPopulator(dbRepository, config);
-//            populator.fillInTables(shopAddresses, itemTypes);
+            DataPopulator populator = new DataPopulator(dbRepository, config);
+            populator.fillInTables(shopAddresses, itemTypes);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
