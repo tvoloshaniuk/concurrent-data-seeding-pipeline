@@ -2,5 +2,7 @@
 <project version="4">
   <component name="DataSourcePerFileMappings">
     <file url="file://$PROJECT_DIR$/src/main/java/ua/shpp/App.java" value="0dcb0200-712d-4c5c-b16a-1e68c2b159a4" />
+    <file url="file://$PROJECT_DIR$/src/main/java/ua/shpp/db/DbRepository.java" value="0dcb0200-712d-4c5c-b16a-1e68c2b159a4" />
+    <file url="file://$PROJECT_DIR$/src/main/resources/post_load_indexes.sql" value="0dcb0200-712d-4c5c-b16a-1e68c2b159a4" />
   </component>
 </project>

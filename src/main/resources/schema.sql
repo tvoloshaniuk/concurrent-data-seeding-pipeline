@@ -29,7 +29,3 @@ CREATE TABLE ShopEntry (
     CONSTRAINT fk_shop_entry_shop FOREIGN KEY (shop_id) REFERENCES Shop(id) ON DELETE CASCADE,
     CONSTRAINT uq_shop_entry_item_shop UNIQUE (item_id, shop_id)
 );
-
-CREATE INDEX idx_item_type_name ON ItemType(name);
-CREATE INDEX idx_item_type_id ON Item(type_id);
-CREATE INDEX idx_shop_entry_count ON ShopEntry(item_id, item_count);

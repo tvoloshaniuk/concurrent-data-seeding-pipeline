@@ -1,4 +1,4 @@
-package ua.shpp;
+package ua.shpp.utils;
 
 import java.io.IOException;
 import java.io.InputStream;

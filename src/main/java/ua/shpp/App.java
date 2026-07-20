@@ -1,21 +1,15 @@
 package ua.shpp;
 
-import net.datafaker.Faker;
-import net.datafaker.providers.base.BaseProviders;
 import org.postgresql.ds.PGSimpleDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import ua.shpp.config.AppConfig;
+import ua.shpp.db.DbRepository;
+import ua.shpp.utils.ResourceLoader;
 
 import javax.sql.DataSource;
 import java.io.IOException;
 import java.io.InputStream;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
 
 public class App {
     private static final Logger log = LoggerFactory.getLogger(App.class);
@@ -35,6 +29,9 @@ public class App {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+
+        // Create indexes after data population, not before -- to improve performance
+        dbRepository.runDdl(ResourceLoader.readText("post_load_indexes.sql"));
 
 //        String topShop = dbRepository.findShopWithMaxItems(config.itemType());
 //        log.info("Top Shop: {}", topShop);

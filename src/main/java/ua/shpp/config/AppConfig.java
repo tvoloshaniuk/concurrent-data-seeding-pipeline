@@ -1,7 +1,8 @@
-package ua.shpp;
+package ua.shpp.config;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import ua.shpp.utils.ResourceLoader;
 
 import java.util.Properties;
 
@@ -10,9 +11,13 @@ public record AppConfig(
         String dbUser,
         String dbPassword,
         int queueCapacity,
-        int threadPoolSize,
+        int producerThreadPoolSize,
+        int consumerThreadPoolSize,
         int batchSize,
-        String itemType
+        String itemType,
+        int shopEntryTarget,
+        int typeIncreaseCoefficient,
+        int maxItemCount
 ) {
     private static final Logger log = LoggerFactory.getLogger(AppConfig.class);
 
@@ -21,9 +26,13 @@ public record AppConfig(
         requireNotBlank(dbUser, "dbUser");
         requireNotBlank(dbPassword, "dbPassword");
         requirePositive(queueCapacity, "queueCapacity");
-        requirePositive(threadPoolSize, "threadPoolSize");
+        requirePositive(producerThreadPoolSize, "producerThreadPoolSize");
+        requirePositive(consumerThreadPoolSize, "consumerThreadPoolSize");
         requirePositive(batchSize, "batchSize");
         requireNotBlank(itemType, "itemType");
+        requirePositive(shopEntryTarget, "shopEntryTarget");
+        requirePositive(typeIncreaseCoefficient, "typeIncreaseCoefficient");
+        requirePositive(maxItemCount, "maxItemCount");
     }
 
     public static AppConfig load(String[] args) {
@@ -33,18 +42,28 @@ public record AppConfig(
                 requiredString(properties, "db.user"),
                 requiredString(properties, "db.password"),
                 requiredInt(properties, "queue.capacity"),
-                requiredInt(properties, "thread.pool.size"),
+                requiredInt(properties, "producer.thread.pool.size"),
+                requiredInt(properties, "consumer.thread.pool.size"),
                 requiredInt(properties, "batch.size"),
-                requiredItemType(args)
+                requiredItemType(args),
+                requiredInt(properties, "shop.entry.target"),
+                requiredInt(properties, "type.increase.coefficient"),
+                requiredInt(properties, "max.item.count")
         );
         log.info(
-                "Loaded config: dbUrl={}, dbUser={}, queueCapacity={}, threadPoolSize={}, batchSize={}, itemType={}",
+                "Loaded config: dbUrl={}, dbUser={}, queueCapacity={}, producerThreadPoolSize={}, "
+                        + "consumerThreadPoolSize={}, batchSize={}, itemType={}, shopEntryTarget={}, "
+                        + "typeIncreaseCoefficient={}, maxItemCount={}",
                 config.dbUrl(),
                 config.dbUser(),
                 config.queueCapacity(),
-                config.threadPoolSize(),
+                config.producerThreadPoolSize(),
+                config.consumerThreadPoolSize(),
                 config.batchSize(),
-                config.itemType()
+                config.itemType(),
+                config.shopEntryTarget(),
+                config.typeIncreaseCoefficient(),
+                config.maxItemCount()
         );
         return config;
     }

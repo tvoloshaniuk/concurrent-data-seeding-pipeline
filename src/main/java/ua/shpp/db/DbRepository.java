@@ -1,7 +1,10 @@
-package ua.shpp;
+package ua.shpp.db;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import ua.shpp.dto.ItemDto;
+import ua.shpp.dto.ItemTypeDto;
+import ua.shpp.dto.ShopDto;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -19,6 +22,9 @@ public class DbRepository {
         this.dataSource = dataSource;
     }
 
+    // suppression: sql is always the content of a trusted, static classpath resource (schema.sql, post_load_indexes.sql)
+    //, never external/user input; DDL statements also don't support PreparedStatement parameters.
+    @SuppressWarnings({"SqlSourceToSinkFlow"})
     public void runDdl(String sql) {
         try (
                 Connection connection = dataSource.getConnection();
@@ -55,6 +61,25 @@ public class DbRepository {
         ) {
             for (ItemTypeDto type : types) {
                 statement.setString(1, type.name());
+                statement.addBatch();
+            }
+            statement.executeBatch();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void batchInsertItems(List<ItemDto> items) {
+        // ON CONFLICT DO NOTHING is a defensive safety net for Item(name) UNIQUE — names are
+        // UUIDs, so a real collision is astronomically unlikely, not the normal path.
+        String sql = "INSERT INTO Item(name, type_id) VALUES (?, ?) ON CONFLICT DO NOTHING";
+        try (
+                Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql)
+        ) {
+            for (ItemDto item : items) {
+                statement.setString(1, item.name());
+                statement.setInt(2, item.typeId());
                 statement.addBatch();
             }
             statement.executeBatch();
