@@ -21,8 +21,10 @@ public final class CsvColumnReader {
     private CsvColumnReader() {
     }
 
-    // Reads the first column of every data row; header row is skipped and quotes are
-    // un-escaped by CSVFormat, not by manual string manipulation.
+    /**
+     * Reads the first column of every data row; header row is skipped and quotes are
+     * un-escaped by CSVFormat, not by manual string manipulation.
+     */
     public static List<String> readSingleColumn(InputStream stream) {
         try (
                 Reader reader = new InputStreamReader(stream, StandardCharsets.UTF_8);

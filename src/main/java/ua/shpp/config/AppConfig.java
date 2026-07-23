@@ -17,7 +17,7 @@ public record AppConfig(
         String itemType,
         int shopEntryTarget,
         int typeIncreaseCoefficient,
-        int maxItemCount
+        int maxStockQuantity
 ) {
     private static final Logger log = LoggerFactory.getLogger(AppConfig.class);
 
@@ -32,7 +32,7 @@ public record AppConfig(
         requireNotBlank(itemType, "itemType");
         requirePositive(shopEntryTarget, "shopEntryTarget");
         requirePositive(typeIncreaseCoefficient, "typeIncreaseCoefficient");
-        requirePositive(maxItemCount, "maxItemCount");
+        requirePositive(maxStockQuantity, "maxStockQuantity");
     }
 
     public static AppConfig load(String[] args) {
@@ -48,12 +48,12 @@ public record AppConfig(
                 requiredItemType(args),
                 requiredInt(properties, "shop.entry.target"),
                 requiredInt(properties, "type.increase.coefficient"),
-                requiredInt(properties, "max.item.count")
+                requiredInt(properties, "max.stock.quantity")
         );
         log.info(
                 "Loaded config: dbUrl={}, dbUser={}, queueCapacity={}, producerThreadPoolSize={}, "
                         + "consumerThreadPoolSize={}, batchSize={}, itemType={}, shopEntryTarget={}, "
-                        + "typeIncreaseCoefficient={}, maxItemCount={}",
+                        + "typeIncreaseCoefficient={}, maxStockQuantity={}",
                 config.dbUrl(),
                 config.dbUser(),
                 config.queueCapacity(),
@@ -63,7 +63,7 @@ public record AppConfig(
                 config.itemType(),
                 config.shopEntryTarget(),
                 config.typeIncreaseCoefficient(),
-                config.maxItemCount()
+                config.maxStockQuantity()
         );
         return config;
     }
