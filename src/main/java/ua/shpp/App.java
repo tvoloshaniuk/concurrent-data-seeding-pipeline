@@ -10,7 +10,7 @@ public class App {
     public static void main(String[] args) {
         AppConfig config = AppConfig.load(args);
         try {
-            new EpicentrSeedingService(config).run();
+            new EpicenterSeedingService(config).run();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.error("Interrupted while running the pipeline", e);

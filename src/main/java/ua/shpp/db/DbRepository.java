@@ -135,7 +135,7 @@ public class DbRepository {
         return inserted;
     }
 
-    public String findShopWithMaxItems(String itemType) {
+    public String findShopWithMaxItems(String itemType) { //todo дописати цей запит. і виправити бо не працює
         String sql = """
                 SELECT s.address
                 FROM ShopEntry se

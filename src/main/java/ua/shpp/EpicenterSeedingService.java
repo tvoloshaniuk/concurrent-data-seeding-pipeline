@@ -16,13 +16,13 @@ import java.io.InputStream;
  * Item, ShopEntry), build indexes, then search for the top shop. main() just constructs one
  * instance and calls run() - every actual step lives here as an instance method.
  */
-public class EpicentrSeedingService {
-    private static final Logger log = LoggerFactory.getLogger(EpicentrSeedingService.class);
+public class EpicenterSeedingService {
+    private static final Logger log = LoggerFactory.getLogger(EpicenterSeedingService.class);
 
     private final AppConfig config;
     private final DbRepository dbRepository;
 
-    public EpicentrSeedingService(AppConfig config) {
+    public EpicenterSeedingService(AppConfig config) {
         this.config = config;
         this.dbRepository = new DbRepository(initDatasource(config));
     }
@@ -32,6 +32,8 @@ public class EpicentrSeedingService {
 
         DataPopulator.PopulationSummary summary = fillFoundationTables();
         fillShopEntryTable(summary);
+
+        //todo не вистачає виклику  findAndLogTopShop перед створенням індексів щоб порівняти швидкість пошуку до та після
 
         // Create indexes after data population, not before -- to improve performance
         dbRepository.runDdl(ResourceLoader.readText("post_load_indexes.sql"));
@@ -56,7 +58,7 @@ public class EpicentrSeedingService {
     private void fillShopEntryTable(DataPopulator.PopulationSummary summary) throws InterruptedException {
         long startMillis = System.currentTimeMillis();
         new ProducerConsumerPipeline().run(dbRepository, config, summary.shopCount(), summary.itemCatalogSize());
-        log.info("ShopEntry generation+insertion took {} ms", System.currentTimeMillis() - startMillis);
+        log.info("ShopEntry generation+insertion took {} ms", System.currentTimeMillis() - startMillis); //todo цього надто мало. треба щоб ще окремо продюсер, окремо консюмер по ms рахувалися. бо зараз це все разом. і не зрозуміло скільки часу займає генерація, скільки вставка в базу. + можливо треба ще додати gneration dto speed: N/sec, insertion dto speed: N/sec
     }
 
     private void findAndLogTopShop() {

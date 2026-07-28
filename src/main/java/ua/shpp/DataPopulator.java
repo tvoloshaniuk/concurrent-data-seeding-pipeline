@@ -16,10 +16,10 @@ import java.util.UUID;
 
 
 /**
- * Fills the tables that can be populated in a single sequential pass (no parallel pipeline
- * needed): Shop and ItemType - directly from CSV, Item - CSV categories plus its own
- * generation. ShopEntry (3M+ rows) is out of scope here - it gets its own
- * parallel pipeline (ShopEntryGenerator + ProducerConsumerPipeline).
+ * Fills the tables that can be populated in a single sequential pass (no parallel pipeline needed):
+ *  Shop and ItemType - directly from CSV, Item - CSV categories plus its own generation.
+ * ShopEntry (3M+ rows) is out of scope here - it gets its own parallel pipeline
+ *  (ShopEntryGenerator + ProducerConsumerPipeline).
  */
 public class DataPopulator {
     private final DbRepository dbRepository;

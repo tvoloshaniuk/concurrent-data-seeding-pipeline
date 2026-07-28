@@ -25,13 +25,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Producer/consumer logic itself lives in their own classes.
  */
 public class ProducerConsumerPipeline {
-
     private static final Logger log = LoggerFactory.getLogger(ProducerConsumerPipeline.class);
-
-
     // Unique sentinel instance (not List.of()) so reference equality (==) is reliable.
     private static final List<ShopEntryDto> POISON_PILL = new ArrayList<>();
-
     private final AtomicInteger insertedCount = new AtomicInteger(0);
 
     public void run(DbRepository dbRepository, AppConfig config, int shopCount, int itemCatalogSize)
@@ -47,7 +43,7 @@ public class ProducerConsumerPipeline {
         ShopEntryGenerator generator = new ShopEntryGenerator(config.maxStockQuantity());
 
         /**
-         * Consumers must be running BEFORE producers start filling the bounded queue -
+         * Consumers must be running BEFORE producers start filling the bounded queue - //todo виправити цей костиль щодо послідовності їх виклику
          * otherwise producers block on queue.put() once it fills up, with nobody around to
          * drain it, and the pipeline deadlocks. Consumers are cheap to start early: with an
          * empty queue they just block on take() until the first batch arrives.

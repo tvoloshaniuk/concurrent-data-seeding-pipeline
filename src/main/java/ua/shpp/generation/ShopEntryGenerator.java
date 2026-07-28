@@ -9,7 +9,8 @@ import java.util.Random;
 public class ShopEntryGenerator {
 
     private final Random random = new Random();
-    private final int maxStockQuantity; // config.maxStockQuantity() - inclusive upper bound for the random item_count value
+    // config.maxStockQuantity() - inclusive upper bound for the random item_count value
+    private final int maxStockQuantity;
 
     public ShopEntryGenerator(int maxStockQuantity) {
         this.maxStockQuantity = maxStockQuantity;
@@ -23,7 +24,8 @@ public class ShopEntryGenerator {
      * itemCount=0 (listed, out of stock) rather than by skipping the row.
      * <p>
      * shopId's upper bound is checked here in code, not via a @Max on ShopEntryDto, because
-     * it depends on the real shop count from shops.csv, known only at runtime.
+     * it depends on the real shop count from shops.csv, known only at runtime. //todo зайве видалити
+     * @param itemCatalogSize the number of distinct items in the catalog (1..itemCatalogSize)
      */
     public List<ShopEntryDto> generateForShop(int shopId, int shopCount, int itemCatalogSize) {
         if (shopId < 1 || shopId > shopCount) {
