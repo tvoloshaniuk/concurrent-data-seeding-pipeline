@@ -1,7 +1,6 @@
-package ua.shpp;
+package ua.shpp.utils;
 
 import ua.shpp.config.AppConfig;
-import ua.shpp.csv.CsvColumnReader;
 import ua.shpp.db.DbRepository;
 import ua.shpp.dto.ItemDto;
 import ua.shpp.dto.ItemTypeDto;

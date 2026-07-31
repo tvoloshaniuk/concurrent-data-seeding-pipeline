@@ -1,4 +1,4 @@
-package ua.shpp.csv;
+package ua.shpp.utils;
 
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;

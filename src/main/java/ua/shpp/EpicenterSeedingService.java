@@ -5,6 +5,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ua.shpp.config.AppConfig;
 import ua.shpp.db.DbRepository;
+import ua.shpp.pipeline.ProducerConsumerPipeline;
+import ua.shpp.utils.DataPopulator;
 import ua.shpp.utils.ResourceLoader;
 
 import javax.sql.DataSource;
@@ -33,12 +35,12 @@ public class EpicenterSeedingService {
         DataPopulator.PopulationSummary summary = fillFoundationTables();
         fillShopEntryTable(summary);
 
-        //todo не вистачає виклику  findAndLogTopShop перед створенням індексів щоб порівняти швидкість пошуку до та після
+        findAndLogTopShop("before indexes");
 
         // Create indexes after data population, not before -- to improve performance
         dbRepository.runDdl(ResourceLoader.readText("post_load_indexes.sql"));
 
-        findAndLogTopShop();
+        findAndLogTopShop("after indexes");
     }
 
     // Fills Shop, ItemType and Item - the three small/sequential tables ShopEntry depends on.
@@ -54,17 +56,22 @@ public class EpicenterSeedingService {
         }
     }
 
-    // Fills the final, largest table (ShopEntry, 3M+ rows) via the parallel pipeline.
+    /**
+     * Fills the final, largest table (ShopEntry, 3M+ rows) via the parallel pipeline.
+     * Producer (generation) vs consumer (insertion) timing/throughput is broken out inside
+     * ProducerConsumerPipeline itself, since only it knows each phase's real start/end - this
+     * is just the combined wall-clock total for the whole step.
+     */
     private void fillShopEntryTable(DataPopulator.PopulationSummary summary) throws InterruptedException {
         long startMillis = System.currentTimeMillis();
         new ProducerConsumerPipeline().run(dbRepository, config, summary.shopCount(), summary.itemCatalogSize());
-        log.info("ShopEntry generation+insertion took {} ms", System.currentTimeMillis() - startMillis); //todo цього надто мало. треба щоб ще окремо продюсер, окремо консюмер по ms рахувалися. бо зараз це все разом. і не зрозуміло скільки часу займає генерація, скільки вставка в базу. + можливо треба ще додати gneration dto speed: N/sec, insertion dto speed: N/sec
+        log.info("ShopEntry generation+insertion took {} ms", System.currentTimeMillis() - startMillis);
     }
 
-    private void findAndLogTopShop() {
+    private void findAndLogTopShop(String phase) {
         long startMillis = System.currentTimeMillis();
         String topShop = dbRepository.findShopWithMaxItems(config.itemType());
-        log.info("Top Shop: {} (found in {} ms)", topShop, System.currentTimeMillis() - startMillis);
+        log.info("Top Shop ({}): {} (found in {} ms)", phase, topShop, System.currentTimeMillis() - startMillis);
     }
 
     private static DataSource initDatasource(AppConfig config) {

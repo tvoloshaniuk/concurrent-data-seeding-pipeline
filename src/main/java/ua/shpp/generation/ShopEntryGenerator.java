@@ -22,9 +22,6 @@ public class ShopEntryGenerator {
      * the row count (shopCount * itemCatalogSize) is exactly deterministic - no probability
      * or safety margin involved. A shop not actually carrying an item is expressed as
      * itemCount=0 (listed, out of stock) rather than by skipping the row.
-     * <p>
-     * shopId's upper bound is checked here in code, not via a @Max on ShopEntryDto, because
-     * it depends on the real shop count from shops.csv, known only at runtime. //todo зайве видалити
      * @param itemCatalogSize the number of distinct items in the catalog (1..itemCatalogSize)
      */
     public List<ShopEntryDto> generateForShop(int shopId, int shopCount, int itemCatalogSize) {

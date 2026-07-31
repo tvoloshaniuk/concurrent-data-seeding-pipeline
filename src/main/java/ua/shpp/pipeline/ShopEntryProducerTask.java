@@ -7,13 +7,18 @@ import ua.shpp.generation.ShopEntryGenerator;
 
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Callable;
 
 /**
  * CPU-bound: generates one shop's entries and splits them into batches on the queue.
- * Never touches the database - that's the consumer's job. One instance handles one shop;
- * the pipeline creates one task per shopId.
+ * Never touches the database - that's the consumer's job.
+ * <p>
+ * Scoped to a single shop, unlike the shop-agnostic ShopEntryConsumer: the pipeline builds
+ * one instance per shopId, and each one only ever knows its own shop. That is what lets
+ * several producers run without coordinating - their (itemId, shopId) ranges cannot overlap
+ * by construction. It also caps the useful producer count at shopCount.
  */
-public class ShopEntryProducerTask implements Runnable {
+public class ShopEntryProducerTask implements Callable<Void> {
     private static final Logger log = LoggerFactory.getLogger(ShopEntryProducerTask.class);
 
     private final ShopEntryGenerator generator;
@@ -34,29 +39,16 @@ public class ShopEntryProducerTask implements Runnable {
     }
 
     @Override
-    public void run() {
+        public Void call() throws InterruptedException {
         List<ShopEntryDto> shopEntries = generator.generateForShop(shopId, shopCount, itemCatalogSize);
         log.debug("Shop {}/{}: generated {} entries, queuing in batches of {}",
                 shopId, shopCount, shopEntries.size(), batchSize);
 
         for (int batchStart = 0; batchStart < shopEntries.size(); batchStart += batchSize) {
-            if (Thread.currentThread().isInterrupted()) {
-                log.warn("Shop {}: producer interrupted, aborting with {} of {} entries still unqueued",
-                        shopId, shopEntries.size() - batchStart, shopEntries.size());
-                return;
-            }
             int batchEnd = Math.min(batchStart + batchSize, shopEntries.size());
-            put(shopEntries.subList(batchStart, batchEnd));
+            queue.put(shopEntries.subList(batchStart, batchEnd));
         }
         log.debug("Shop {}/{}: all batches queued", shopId, shopCount);
-    }
-
-    private void put(List<ShopEntryDto> batch) {
-        try {
-            queue.put(batch);
-        } catch (InterruptedException e) {
-            log.warn("Interrupted while queuing a batch", e);
-            Thread.currentThread().interrupt();
-        }
+        return null;
     }
 }
