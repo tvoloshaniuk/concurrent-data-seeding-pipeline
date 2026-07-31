@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * I/O-bound: validates and inserts batches until it receives the poison pill sentinel.
  * <p>
- * Shop-agnostic, unlike the single-shop ShopEntryProducerTask: one instance per consumer
+ * Shop-agnostic, unlike the single-shop ShopEntryProducerSubtask: one instance per consumer
  * thread rather than per shop, and each takes whatever batch reaches the head of the queue,
  * from any shop. That asymmetry is why the consumer pool size is a free tuning knob - more
  * consumers need no change to the data layout - while producers are capped by shopCount.

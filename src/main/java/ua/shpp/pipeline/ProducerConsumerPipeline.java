@@ -6,6 +6,7 @@ import ua.shpp.config.AppConfig;
 import ua.shpp.db.DbRepository;
 import ua.shpp.dto.ShopEntryDto;
 import ua.shpp.exceptions.PipelineTaskException;
+import ua.shpp.exceptions.RowCountMismatchException;
 import ua.shpp.generation.ShopEntryGenerator;
 
 import java.util.ArrayList;
@@ -20,7 +21,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Orchestration only: sets up the queue and thread pools, starts ShopEntryProducerTask/
+ * Orchestration only: sets up the queue and thread pools, starts ShopEntryProducerSubtask/
  * ShopEntryConsumer workers, coordinates shutdown via poison pills, logs the summary.
  * Producer/consumer logic itself lives in their own classes.
  */
@@ -41,41 +42,47 @@ public class ProducerConsumerPipeline {
 
         BlockingQueue<List<ShopEntryDto>> queue = new ArrayBlockingQueue<>(config.queueCapacity());
         ShopEntryGenerator generator = new ShopEntryGenerator(config.maxStockQuantity());
-        List<Future<?>> producerFutures = new ArrayList<>();
+        List<Future<Integer>> producerFutures = new ArrayList<>();
         List<Future<?>> consumerFutures = new ArrayList<>();
 
         try (
                 ExecutorService producers = Executors.newFixedThreadPool(config.producerThreadPoolSize());
                 ExecutorService consumers = Executors.newFixedThreadPool(config.consumerThreadPoolSize())
         ) {
+            // Start Producer
             long producersStartMillis = System.currentTimeMillis();
             for (int shopId = 1; shopId <= shopCount; shopId++) {
-                producerFutures.add(producers.submit(new ShopEntryProducerTask(generator, queue, shopId, shopCount,
+                producerFutures.add(producers.submit(new ShopEntryProducerSubtask(generator, queue, shopId, shopCount,
                         itemCatalogSize, config.batchSize())));
             }
             log.info("Submitted {} producer tasks (pool size {}), waiting for completion...",
                     shopCount, config.producerThreadPoolSize());
 
+            // Start Consumer
             long consumersStartMillis = System.currentTimeMillis();
             for (int i = 0; i < config.consumerThreadPoolSize(); i++) {
-                consumerFutures.add(consumers.submit(
-                        new ShopEntryConsumer(dbRepository, queue, POISON_PILL, insertedCount))
+                consumerFutures.add(consumers.submit(new ShopEntryConsumer(dbRepository, queue, POISON_PILL,
+                        insertedCount))
                 );
             }
+            log.info("Submitted {} consumer tasks (pool size {}), waiting for completion...",
+                    config.consumerThreadPoolSize(), config.consumerThreadPoolSize());
 
-            // WaitProducer -> Send PoisonPills -> WaitConsumer.
+            // Wait Producer -> Send PoisonPills -> Wait Consumer.
+            long generatedRows;
             long producerMillis;
             try {
-                awaitCompletion(producerFutures, "producer");
+                generatedRows = awaitProducers(producerFutures);
                 producerMillis = System.currentTimeMillis() - producersStartMillis;
             } finally {
                 sendPoisonPills(queue, config.consumerThreadPoolSize());
             }
 
-            awaitCompletion(consumerFutures, "consumer");
+            awaitConsumers(consumerFutures); //todo тут немає consumedRows?
             long consumerMillis = System.currentTimeMillis() - consumersStartMillis;
 
-            logSummary(config, plannedRows, producerMillis, consumerMillis);
+            logSummary(config, generatedRows, producerMillis, consumerMillis);
+            verifyTargetReached(config);
         }
     }
 
@@ -87,36 +94,46 @@ public class ProducerConsumerPipeline {
     }
 
     /**
-     * Blocks until every task has finished, then rethrows the first failure instead of
-     * letting it vanish inside an unchecked Future. Failing fast is deliberate: a dead
-     * producer (e.g. the shopId-range guard in ShopEntryGenerator) means the data set is
-     * already incomplete, so carrying on would only hide that. Batch-level insert failures
-     * are the separate, tolerated case - ShopEntryConsumer swallows those on purpose.
+     * Blocks until every producer has finished and returns how many rows they generated in
+     * total - measured rather than assumed, so the summary never reports rows that were
+     * never built.
      */
-    private void awaitCompletion(List<Future<?>> futures, String role) throws InterruptedException {
+    private long awaitProducers(List<Future<Integer>> futures) throws InterruptedException {
+        long generatedRows = 0;
+        for (Future<Integer> future : futures) {
+            generatedRows += awaitOne(future, "producer");
+        }
+        return generatedRows;
+    }
+
+    private void awaitConsumers(List<Future<?>> futures) throws InterruptedException {
         for (Future<?> future : futures) {
-            try {
-                future.get();
-            } catch (ExecutionException e) {
-                throw new PipelineTaskException("A " + role + " task failed", e.getCause());
-            }
+            awaitOne(future, "consumer");
         }
     }
 
-    private void logSummary(AppConfig config, long plannedRows, long producerMillis, long consumerMillis) {
-        /*
-         * Not failFast: rows dropped by a failed batch insert are not retried - the sequential
-         * shopId/itemId walk has already moved on. Just report it; the search still runs on
-         * whatever got inserted.
-         */
-        int actual = insertedCount.get();
-        if (actual < config.shopEntryTarget()) {
-            log.warn("Pipeline finished but inserted fewer rows than target: inserted={}, target={}. "
-                            + "Proceeding with the search on incomplete data.",
-                    actual, config.shopEntryTarget());
-        } else {
-            log.info("Pipeline finished successfully: inserted={}, target={}", actual, config.shopEntryTarget());
+    /**
+     * Rethrows a task's failure instead of letting it vanish inside an unchecked Future.
+     * Failing fast is deliberate: a dead worker (e.g. the shopId-range guard in
+     * ShopEntryGenerator) means the data set is already incomplete, so carrying on would
+     * only hide that. Batch-level insert failures are the separate, tolerated case -
+     * ShopEntryConsumer swallows those on purpose and they never reach here.
+     * <p>
+     * InterruptedException is deliberately not caught: it says this waiting thread was asked
+     * to stop, not that a task broke, so wrapping it as a task failure would be a lie.
+     */
+    private <T> T awaitOne(Future<T> future, String role) throws InterruptedException {
+        try {
+            return future.get();
+        } catch (ExecutionException e) {
+            throw new PipelineTaskException("A " + role + " task failed", e.getCause());
         }
+    }
+
+    private void logSummary(AppConfig config, long generatedRows, long producerMillis, long consumerMillis) {
+        int inserted = insertedCount.get();
+        log.info("Pipeline finished: generated={}, inserted={}, target={}",
+                generatedRows, inserted, config.shopEntryTarget());
 
         /*
          * Producer and consumer phases overlap in wall time (consumers start early and drain
@@ -125,8 +142,24 @@ public class ProducerConsumerPipeline {
          * to the "generation+insertion took X ms" figure logged by the caller.
          */
         log.info("Generation: {} rows in {} ms ({} rows/sec). Insertion: {} rows in {} ms ({} rows/sec)",
-                plannedRows, producerMillis, rowsPerSec(plannedRows, producerMillis),
-                actual, consumerMillis, rowsPerSec(actual, consumerMillis));
+                generatedRows, producerMillis, rowsPerSec(generatedRows, producerMillis),
+                inserted, consumerMillis, rowsPerSec(inserted, consumerMillis));
+    }
+
+    /**
+     * Runs after the summary is logged, so the throughput numbers are on record even when
+     * this aborts the run. Individual batch failures are tolerated as they happen, but the
+     * task requires at least shopEntryTarget rows in the end - a shortfall means the data
+     * set is unusable for the search, and that is only knowable from the final count.
+     */
+    private void verifyTargetReached(AppConfig config) {
+        int inserted = insertedCount.get();
+        if (inserted < config.shopEntryTarget()) {
+            throw new RowCountMismatchException(String.format(
+                    "Inserted %d ShopEntry rows, which is below the required target of %d. "
+                            + "Batches were lost during insertion - see the earlier consumer errors.",
+                    inserted, config.shopEntryTarget()));
+        }
     }
 
     /**

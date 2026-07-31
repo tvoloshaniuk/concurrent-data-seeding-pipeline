@@ -17,9 +17,13 @@ import java.util.concurrent.Callable;
  * one instance per shopId, and each one only ever knows its own shop. That is what lets
  * several producers run without coordinating - their (itemId, shopId) ranges cannot overlap
  * by construction. It also caps the useful producer count at shopCount.
+ * <p>
+ * Returns how many rows it generated, so the pipeline can report a measured total instead
+ * of the planned one. Being a Callable also lets call() declare throws InterruptedException,
+ * so an interrupt aborts the task at the first queue.put() with no manual flag check.
  */
-public class ShopEntryProducerTask implements Callable<Void> {
-    private static final Logger log = LoggerFactory.getLogger(ShopEntryProducerTask.class);
+public class ShopEntryProducerSubtask implements Callable<Integer> {
+    private static final Logger log = LoggerFactory.getLogger(ShopEntryProducerSubtask.class);
 
     private final ShopEntryGenerator generator;
     private final BlockingQueue<List<ShopEntryDto>> queue;
@@ -28,8 +32,8 @@ public class ShopEntryProducerTask implements Callable<Void> {
     private final int itemCatalogSize;
     private final int batchSize;
 
-    public ShopEntryProducerTask(ShopEntryGenerator generator, BlockingQueue<List<ShopEntryDto>> queue,
-                                  int shopId, int shopCount, int itemCatalogSize, int batchSize) {
+    public ShopEntryProducerSubtask(ShopEntryGenerator generator, BlockingQueue<List<ShopEntryDto>> queue,
+                                    int shopId, int shopCount, int itemCatalogSize, int batchSize) {
         this.generator = generator;
         this.queue = queue;
         this.shopId = shopId;
@@ -39,7 +43,7 @@ public class ShopEntryProducerTask implements Callable<Void> {
     }
 
     @Override
-        public Void call() throws InterruptedException {
+    public Integer call() throws InterruptedException {
         List<ShopEntryDto> shopEntries = generator.generateForShop(shopId, shopCount, itemCatalogSize);
         log.debug("Shop {}/{}: generated {} entries, queuing in batches of {}",
                 shopId, shopCount, shopEntries.size(), batchSize);
@@ -49,6 +53,6 @@ public class ShopEntryProducerTask implements Callable<Void> {
             queue.put(shopEntries.subList(batchStart, batchEnd));
         }
         log.debug("Shop {}/{}: all batches queued", shopId, shopCount);
-        return null;
+        return shopEntries.size();
     }
 }
