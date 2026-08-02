@@ -8,7 +8,7 @@ import ua.shpp.hibernateValidator.ValidatorUtil;
 
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.Callable;
 
 /**
  * I/O-bound: validates and inserts batches until it receives the poison pill sentinel.
@@ -17,30 +17,33 @@ import java.util.concurrent.atomic.AtomicInteger;
  * thread rather than per shop, and each takes whatever batch reaches the head of the queue,
  * from any shop. That asymmetry is why the consumer pool size is a free tuning knob - more
  * consumers need no change to the data layout - while producers are capped by shopCount.
+ * <p>
+ * Returns its own inserted-row count, so the pipeline sums the Futures instead of every
+ * consumer hammering one shared counter. Being a Callable also lets call() declare throws
+ * InterruptedException, so an interrupt ends this consumer at queue.take() by itself.
  */
-public class ShopEntryConsumer implements Runnable {
+public class ShopEntryConsumer implements Callable<Integer> {
     private static final Logger log = LoggerFactory.getLogger(ShopEntryConsumer.class);
 
     private final DbRepository dbRepository;
     private final BlockingQueue<List<ShopEntryDto>> queue;
     private final List<ShopEntryDto> poisonPill;
-    private final AtomicInteger insertedCount;
 
     public ShopEntryConsumer(DbRepository dbRepository, BlockingQueue<List<ShopEntryDto>> queue,
-                              List<ShopEntryDto> poisonPill, AtomicInteger insertedCount) {
+                              List<ShopEntryDto> poisonPill) {
         this.dbRepository = dbRepository;
         this.queue = queue;
         this.poisonPill = poisonPill;
-        this.insertedCount = insertedCount;
     }
 
     @Override
-    public void run() {
+    public Integer call() throws InterruptedException {
         String consumerName = Thread.currentThread().getName();
+        int insertedRows = 0;
         int consumedBatches = 0;
         int failedBatches = 0;
         List<ShopEntryDto> batch;
-        while ((batch = take()) != poisonPill) {
+        while ((batch = queue.take()) != poisonPill) {
             List<ShopEntryDto> validBatch = batch.stream()
                     .filter(ValidatorUtil::isValid)
                     .toList();
@@ -53,12 +56,11 @@ public class ShopEntryConsumer implements Runnable {
              * up its poison pill and starves another still-alive consumer of the real work.
              */
             try {
-                int actuallyInserted = dbRepository.batchInsertShopEntries(validBatch);
-                int total = insertedCount.addAndGet(actuallyInserted);
+                insertedRows += dbRepository.batchInsertShopEntries(validBatch);
                 consumedBatches++;
                 if (consumedBatches % 100 == 0) {
                     log.info("Consumer {}: {} batches processed, {} rows inserted so far",
-                            consumerName, consumedBatches, total);
+                            consumerName, consumedBatches, insertedRows);
                 }
             } catch (RuntimeException e) {
                 failedBatches++;
@@ -66,17 +68,8 @@ public class ShopEntryConsumer implements Runnable {
                         consumerName, validBatch.size(), failedBatches, e);
             }
         }
-        log.info("Consumer {}: received poison pill, stopping after {} batches ({} failed)",
-                consumerName, consumedBatches, failedBatches);
-    }
-
-    private List<ShopEntryDto> take() {
-        try {
-            return queue.take();
-        } catch (InterruptedException e) {
-            log.warn("Interrupted while waiting for a batch from the queue, stopping this consumer", e);
-            Thread.currentThread().interrupt();
-            return poisonPill;
-        }
+        log.info("Consumer {}: received poison pill, stopping after {} batches ({} failed), {} rows inserted",
+                consumerName, consumedBatches, failedBatches, insertedRows);
+        return insertedRows;
     }
 }

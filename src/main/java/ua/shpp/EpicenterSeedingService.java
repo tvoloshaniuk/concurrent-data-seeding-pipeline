@@ -16,7 +16,7 @@ import java.io.InputStream;
 /**
  * Owns the whole seed-and-search flow: create schema, fill the four tables (Shop, ItemType,
  * Item, ShopEntry), build indexes, then search for the top shop. main() just constructs one
- * instance and calls run() - every actual step lives here as an instance method.
+ * instance and calls execute() - every actual step lives here as an instance method.
  */
 public class EpicenterSeedingService {
     private static final Logger log = LoggerFactory.getLogger(EpicenterSeedingService.class);
@@ -29,7 +29,7 @@ public class EpicenterSeedingService {
         this.dbRepository = new DbRepository(initDatasource(config));
     }
 
-    public void run() throws InterruptedException {
+    public void execute() throws InterruptedException {
         dbRepository.runDdl(ResourceLoader.readText("schema.sql"));
 
         DataPopulator.PopulationSummary summary = fillFoundationTables();
@@ -64,7 +64,7 @@ public class EpicenterSeedingService {
      */
     private void fillShopEntryTable(DataPopulator.PopulationSummary summary) throws InterruptedException {
         long startMillis = System.currentTimeMillis();
-        new ProducerConsumerPipeline().run(dbRepository, config, summary.shopCount(), summary.itemCatalogSize());
+        new ProducerConsumerPipeline().execute(dbRepository, config, summary.shopCount(), summary.itemCatalogSize());
         log.info("ShopEntry generation+insertion took {} ms", System.currentTimeMillis() - startMillis);
     }
 
