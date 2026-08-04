@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ua.shpp.config.AppConfig;
 import ua.shpp.db.DbRepository;
+import ua.shpp.hibernateValidator.DtoValidator;
 import ua.shpp.pipeline.ProducerConsumerPipeline;
 import ua.shpp.utils.DataPopulator;
 import ua.shpp.utils.ResourceLoader;
@@ -25,31 +26,47 @@ public class EpicenterSeedingService {
     private final DbRepository dbRepository;
 
     public EpicenterSeedingService(AppConfig config) {
-        this.config = config;
-        this.dbRepository = new DbRepository(initDatasource(config));
+        this(config, new DbRepository(initDatasource(config)));
     }
 
+    /**
+     * Package-private so tests can inject a stand-in repository: the public constructor wires
+     * a real PGSimpleDataSource, which would make every test of this class need a database.
+     */
+    EpicenterSeedingService(AppConfig config, DbRepository dbRepository) {
+        this.config = config;
+        this.dbRepository = dbRepository;
+    }
+
+    /**
+     * Owns the validator's lifetime because its useful life is exactly one run: created here,
+     * shared by the populator and every consumer thread, and closed on the way out even if a
+     * step throws. Nothing outside this method can be left holding a closed factory.
+     */
     public void execute() throws InterruptedException {
-        dbRepository.runDdl(ResourceLoader.readText("schema.sql"));
+        try (DtoValidator validator = new DtoValidator()) {
+            dbRepository.runDdl(ResourceLoader.readText("schema.sql"));
 
-        DataPopulator.PopulationSummary summary = fillFoundationTables();
-        fillShopEntryTable(summary);
+            DataPopulator.PopulationSummary summary = fillFoundationTables(validator);
+            verifyItemTypeExists();
+            fillShopEntryTable(summary, validator);
 
-        findAndLogTopShop("before indexes");
+            findAndLogTopShop("before indexes");
 
-        // Create indexes after data population, not before -- to improve performance
-        dbRepository.runDdl(ResourceLoader.readText("post_load_indexes.sql"));
+            // Create indexes after data population, not before -- to improve performance
+            dbRepository.runDdl(ResourceLoader.readText("post_load_indexes.sql"));
 
-        findAndLogTopShop("after indexes");
+            findAndLogTopShop("after indexes");
+        }
     }
 
     // Fills Shop, ItemType and Item - the three small/sequential tables ShopEntry depends on.
-    private DataPopulator.PopulationSummary fillFoundationTables() {
+    private DataPopulator.PopulationSummary fillFoundationTables(DtoValidator validator) {
         try (
                 InputStream shopAddresses = ResourceLoader.stream("shops.csv");
                 InputStream itemTypes = ResourceLoader.stream("item_types.csv")
         ) {
-            DataPopulator populator = new DataPopulator(dbRepository, config);
+            DataPopulator populator = new DataPopulator(dbRepository, config, validator);
             return populator.fillFoundationTables(shopAddresses, itemTypes);
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -62,16 +79,36 @@ public class EpicenterSeedingService {
      * ProducerConsumerPipeline itself, since only it knows each phase's real start/end - this
      * is just the combined wall-clock total for the whole step.
      */
-    private void fillShopEntryTable(DataPopulator.PopulationSummary summary) throws InterruptedException {
+    private void fillShopEntryTable(DataPopulator.PopulationSummary summary, DtoValidator validator)
+            throws InterruptedException {
         long startMillis = System.currentTimeMillis();
-        new ProducerConsumerPipeline().execute(dbRepository, config, summary.shopCount(), summary.itemCatalogSize());
+        new ProducerConsumerPipeline()
+                .execute(dbRepository, validator, config, summary.shopCount(), summary.itemCatalogSize());
         log.info("ShopEntry generation+insertion took {} ms", System.currentTimeMillis() - startMillis);
+    }
+
+    private void verifyItemTypeExists() {
+        if (!dbRepository.existsItemType(config.itemType())) {
+            throw new IllegalArgumentException(String.format(
+                    "Unknown itemType '%s'. ItemType names are base categories from item_types.csv "
+                            + "with a numeric suffix 1..%d appended - try '%s 1'.",
+                    config.itemType(), config.typeIncreaseCoefficient(), config.itemType()));
+        }
     }
 
     private void findAndLogTopShop(String phase) {
         long startMillis = System.currentTimeMillis();
         String topShop = dbRepository.findShopWithMaxItems(config.itemType());
-        log.info("Top Shop ({}): {} (found in {} ms)", phase, topShop, System.currentTimeMillis() - startMillis);
+        long searchMillis = System.currentTimeMillis() - startMillis;
+        // Expected as an unreachable case because of the previous "fail fast" check
+        if (topShop == null) {
+            log.warn(
+                    "No shop found for itemType '{}' ({}) after {} ms, even though the type exists. "
+                            + "Check the ShopEntryGenerator/DataPopulator invariants.",
+                    config.itemType(), phase, searchMillis);
+            return;
+        }
+        log.info("Top Shop ({}): {} (found in {} ms)", phase, topShop, searchMillis);
     }
 
     private static DataSource initDatasource(AppConfig config) {

@@ -5,7 +5,7 @@ import ua.shpp.db.DbRepository;
 import ua.shpp.dto.ItemDto;
 import ua.shpp.dto.ItemTypeDto;
 import ua.shpp.dto.ShopDto;
-import ua.shpp.hibernateValidator.ValidatorUtil;
+import ua.shpp.hibernateValidator.DtoValidator;
 
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -23,11 +23,13 @@ import java.util.UUID;
 public class DataPopulator {
     private final DbRepository dbRepository;
     private final AppConfig config;
+    private final DtoValidator validator;
     private final Random random = new Random();
 
-    public DataPopulator(DbRepository dbRepository, AppConfig config) {
+    public DataPopulator(DbRepository dbRepository, AppConfig config, DtoValidator validator) {
         this.dbRepository = dbRepository;
         this.config = config;
+        this.validator = validator;
     }
 
     /**
@@ -51,10 +53,10 @@ public class DataPopulator {
         return new PopulationSummary(shops.size(), itemCatalogSize);
     }
 
-    private static List<ShopDto> readShops(InputStream stream) {
+    private List<ShopDto> readShops(InputStream stream) {
         List<ShopDto> shops = CsvColumnReader.readSingleColumn(stream).stream()
                 .map(ShopDto::new)
-                .filter(ValidatorUtil::isValid)
+                .filter(validator::isValid)
                 .toList();
         if (shops.size() <= 1) {
             throw new IllegalStateException("shops.csv has too few rows: " + shops.size());
@@ -76,7 +78,7 @@ public class DataPopulator {
             }
         }
         return itemTypes.stream()
-                .filter(ValidatorUtil::isValid)
+                .filter(validator::isValid)
                 .toList();
     }
 
@@ -98,7 +100,7 @@ public class DataPopulator {
             items.add(new ItemDto(i, name, typeId));
         }
         return items.stream()
-                .filter(ValidatorUtil::isValid)
+                .filter(validator::isValid)
                 .toList();
     }
 }

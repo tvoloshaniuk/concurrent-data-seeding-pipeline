@@ -8,8 +8,8 @@ public class App {
     private static final Logger log = LoggerFactory.getLogger(App.class);
 
     public static void main(String[] args) {
-        AppConfig config = AppConfig.load(args);
         try {
+            AppConfig config = AppConfig.load(args);
             new EpicenterSeedingService(config).execute();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

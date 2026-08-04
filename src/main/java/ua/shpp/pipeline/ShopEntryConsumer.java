@@ -4,7 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ua.shpp.db.DbRepository;
 import ua.shpp.dto.ShopEntryDto;
-import ua.shpp.hibernateValidator.ValidatorUtil;
+import ua.shpp.hibernateValidator.DtoValidator;
 
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
@@ -28,24 +28,29 @@ public class ShopEntryConsumer implements Callable<Integer> {
     private final DbRepository dbRepository;
     private final BlockingQueue<List<ShopEntryDto>> queue;
     private final List<ShopEntryDto> poisonPill;
+    private final DtoValidator validator;
 
     public ShopEntryConsumer(DbRepository dbRepository, BlockingQueue<List<ShopEntryDto>> queue,
-                              List<ShopEntryDto> poisonPill) {
+                              List<ShopEntryDto> poisonPill, DtoValidator validator) {
         this.dbRepository = dbRepository;
         this.queue = queue;
         this.poisonPill = poisonPill;
+        this.validator = validator;
     }
 
     @Override
     public Integer call() throws InterruptedException {
         String consumerName = Thread.currentThread().getName();
         int insertedRows = 0;
+
+        // Reported only, never returned - they exist for the progress and shutdown log lines.
         int consumedBatches = 0;
         int failedBatches = 0;
+
         List<ShopEntryDto> batch;
         while ((batch = queue.take()) != poisonPill) {
             List<ShopEntryDto> validBatch = batch.stream()
-                    .filter(ValidatorUtil::isValid)
+                    .filter(validator::isValid)
                     .toList();
             if (validBatch.size() != batch.size()) {
                 log.warn("Consumer {}: {} of {} entries in batch failed validation and were dropped",

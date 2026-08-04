@@ -8,6 +8,7 @@ import ua.shpp.dto.ShopEntryDto;
 import ua.shpp.exceptions.PipelineTaskException;
 import ua.shpp.exceptions.RowCountMismatchException;
 import ua.shpp.generation.ShopEntryGenerator;
+import ua.shpp.hibernateValidator.DtoValidator;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,8 +33,8 @@ public class ProducerConsumerPipeline {
     // Unique sentinel instance (not List.of()) so reference equality (==) is reliable.
     private static final List<ShopEntryDto> POISON_PILL = new ArrayList<>();
 
-    public void execute(DbRepository dbRepository, AppConfig config, int shopCount, int itemCatalogSize)
-            throws InterruptedException {
+    public void execute(DbRepository dbRepository, DtoValidator validator, AppConfig config,
+                        int shopCount, int itemCatalogSize) throws InterruptedException {
         long plannedRows = (long) shopCount * itemCatalogSize;
         log.info("Starting ShopEntry pipeline: shopCount={}, itemCatalogSize={}, plannedRows={}, "
                         + "target={}, producers={}, consumers={}, batchSize={}, queueCapacity={}",
@@ -62,7 +63,8 @@ public class ProducerConsumerPipeline {
             // Start Consumer
             long consumersStartMillis = System.currentTimeMillis();
             for (int i = 0; i < config.consumerThreadPoolSize(); i++) {
-                consumerFutures.add(consumers.submit(new ShopEntryConsumer(dbRepository, queue, POISON_PILL)));
+                consumerFutures.add(consumers.submit(
+                        new ShopEntryConsumer(dbRepository, queue, POISON_PILL, validator)));
             }
             log.info("Submitted {} consumer tasks (pool size {}), waiting for completion...",
                     config.consumerThreadPoolSize(), config.consumerThreadPoolSize());

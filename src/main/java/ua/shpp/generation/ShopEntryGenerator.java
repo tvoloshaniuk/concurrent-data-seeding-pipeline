@@ -18,10 +18,7 @@ public class ShopEntryGenerator {
 
     /**
      * Enumerates every itemId (1..itemCatalogSize) for one shop exactly once and always
-     * inserts a row, so duplicate (item_id, shop_id) pairs are structurally impossible and
-     * the row count (shopCount * itemCatalogSize) is exactly deterministic - no probability
-     * or safety margin involved. A shop not actually carrying an item is expressed as
-     * itemCount=0 (listed, out of stock) rather than by skipping the row.
+     * inserts a row, so duplicate (item_id, shop_id) pairs are structurally impossible
      * @param itemCatalogSize the number of distinct items in the catalog (1..itemCatalogSize)
      */
     public List<ShopEntryDto> generateForShop(int shopId, int shopCount, int itemCatalogSize) {

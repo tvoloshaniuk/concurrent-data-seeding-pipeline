@@ -125,7 +125,7 @@ public class DbRepository {
      * INSERT (Postgres reWriteBatchedInserts) and can't report an exact per-row count -
      * it still means that row was successfully inserted, just without the precise count.
      */
-    private int countInserted(int[] results) {
+    int countInserted(int[] results) {
         int inserted = 0;
         for (int result : results) {
             if (result == Statement.SUCCESS_NO_INFO || result == 1) {
@@ -133,6 +133,21 @@ public class DbRepository {
             }
         }
         return inserted;
+    }
+
+    public boolean existsItemType(String name) {
+        String sql = "SELECT 1 FROM ItemType WHERE name = ? LIMIT 1";
+        try (
+                Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql)
+        ) {
+            statement.setString(1, name);
+            try (ResultSet rs = statement.executeQuery()) {
+                return rs.next();
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public String findShopWithMaxItems(String itemType) {
