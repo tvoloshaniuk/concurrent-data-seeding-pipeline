@@ -135,6 +135,23 @@ public class DbRepository {
         return inserted;
     }
 
+    /**
+     * LIMIT 1 rather than COUNT(*): the question is only whether a previous run left data behind,
+     * and on 3M rows an exact count would cost a full scan to answer something a single row settles.
+     */
+    public boolean hasShopEntries() {
+        String sql = "SELECT 1 FROM ShopEntry LIMIT 1";
+        try (
+                Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql);
+                ResultSet rs = statement.executeQuery()
+        ) {
+            return rs.next();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public boolean existsItemType(String name) {
         String sql = "SELECT 1 FROM ItemType WHERE name = ? LIMIT 1";
         try (

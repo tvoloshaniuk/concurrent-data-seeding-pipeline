@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ua.shpp.dto.ShopEntryDto;
 import ua.shpp.generation.ShopEntryGenerator;
+import ua.shpp.utils.CatalogDimensions;
 
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
@@ -28,31 +29,42 @@ public class ShopEntryProducerSubtask implements Callable<Integer> {
     private final ShopEntryGenerator generator;
     private final BlockingQueue<List<ShopEntryDto>> queue;
     private final int shopId;
-    private final int shopCount;
-    private final int itemCatalogSize;
+    private final CatalogDimensions dimensions;
     private final int batchSize;
 
+    /**
+     * Takes CatalogDimensions rather than two loose ints because shopCount and itemCatalogSize
+     * always travel together, and adjacent int parameters are exactly what the compiler cannot
+     * catch when they get swapped.
+     */
     public ShopEntryProducerSubtask(ShopEntryGenerator generator, BlockingQueue<List<ShopEntryDto>> queue,
-                                    int shopId, int shopCount, int itemCatalogSize, int batchSize) {
+                                    int shopId, CatalogDimensions dimensions, int batchSize) {
         this.generator = generator;
         this.queue = queue;
         this.shopId = shopId;
-        this.shopCount = shopCount;
-        this.itemCatalogSize = itemCatalogSize;
+        this.dimensions = dimensions;
         this.batchSize = batchSize;
     }
 
+    /**
+     * Invalid rows are not made here but inside ShopEntryGenerator, which is what makes hitting
+     * invalidRatePercent straightforward: the generator decides per itemId, so the share falls out
+     * of the loop by itself. This method only slices an already-built list into batches and has no
+     * business knowing what is inside them - the count it returns therefore includes the invalid
+     * ones, which is honest, since they really were generated.
+     */
     @Override
     public Integer call() throws InterruptedException {
-        List<ShopEntryDto> shopEntries = generator.generateForShop(shopId, shopCount, itemCatalogSize);
+        List<ShopEntryDto> shopEntries =
+                generator.generateForShop(shopId, dimensions.shopCount(), dimensions.itemCatalogSize());
         log.debug("Shop {}/{}: generated {} entries, queuing in batches of {}",
-                shopId, shopCount, shopEntries.size(), batchSize);
+                shopId, dimensions.shopCount(), shopEntries.size(), batchSize);
 
         for (int batchStart = 0; batchStart < shopEntries.size(); batchStart += batchSize) {
             int batchEnd = Math.min(batchStart + batchSize, shopEntries.size());
             queue.put(shopEntries.subList(batchStart, batchEnd));
         }
-        log.debug("Shop {}/{}: all batches queued", shopId, shopCount);
+        log.debug("Shop {}/{}: all batches queued", shopId, dimensions.shopCount());
         return shopEntries.size();
     }
 }

@@ -1,6 +1,7 @@
 package ua.shpp.utils;
 
 import org.junit.jupiter.api.Test;
+import ua.shpp.exceptions.ResourceLoadException;
 
 import java.io.InputStream;
 import java.util.Properties;
@@ -24,7 +25,7 @@ class ResourceLoaderTest {
     and a null stream would surface much later as an unrelated NullPointerException. */
     @Test
     void stream_throwsNamingTheResourceThatIsMissing() {
-        RuntimeException thrown = assertThrows(RuntimeException.class, () -> ResourceLoader.stream(MISSING));
+        ResourceLoadException thrown = assertThrows(ResourceLoadException.class, () -> ResourceLoader.stream(MISSING));
 
         assertTrue(thrown.getMessage().contains(MISSING), thrown.getMessage());
     }
@@ -38,7 +39,7 @@ class ResourceLoaderTest {
 
     @Test
     void readText_throwsForMissingResource() {
-        assertThrows(RuntimeException.class, () -> ResourceLoader.readText(MISSING));
+        assertThrows(ResourceLoadException.class, () -> ResourceLoader.readText(MISSING));
     }
 
     @Test
@@ -51,6 +52,6 @@ class ResourceLoaderTest {
 
     @Test
     void readProperties_throwsForMissingResource() {
-        assertThrows(RuntimeException.class, () -> ResourceLoader.readProperties(MISSING));
+        assertThrows(ResourceLoadException.class, () -> ResourceLoader.readProperties(MISSING));
     }
 }

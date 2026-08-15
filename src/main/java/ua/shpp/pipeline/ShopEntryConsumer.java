@@ -4,7 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ua.shpp.db.DbRepository;
 import ua.shpp.dto.ShopEntryDto;
-import ua.shpp.hibernateValidator.DtoValidator;
+import ua.shpp.validation.DtoValidator;
 
 import java.util.List;
 import java.util.concurrent.BlockingQueue;

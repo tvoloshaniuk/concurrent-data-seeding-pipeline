@@ -3,6 +3,7 @@ package ua.shpp.pipeline;
 import org.junit.jupiter.api.Test;
 import ua.shpp.dto.ShopEntryDto;
 import ua.shpp.generation.ShopEntryGenerator;
+import ua.shpp.utils.CatalogDimensions;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -68,8 +69,8 @@ class ShopEntryProducerSubtaskTest {
     }
 
     private ShopEntryProducerSubtask subtask(int shopId, int itemCatalogSize, int batchSize) {
-        return new ShopEntryProducerSubtask(new ShopEntryGenerator(MAX_STOCK_QUANTITY), queue,
-                shopId, SHOP_COUNT, itemCatalogSize, batchSize);
+        return new ShopEntryProducerSubtask(new ShopEntryGenerator(MAX_STOCK_QUANTITY, 0), queue,
+                shopId, new CatalogDimensions(SHOP_COUNT, itemCatalogSize), batchSize);
     }
 
     private List<ShopEntryDto> drain() {

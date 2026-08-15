@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import ua.shpp.dto.ShopEntryDto;
+import ua.shpp.validation.DtoValidator;
 
 import java.util.List;
 
@@ -15,6 +16,7 @@ class ShopEntryGeneratorTest {
     private static final int SHOP_COUNT = 57;
     private static final int ITEM_CATALOG_SIZE = 100;
     private static final int MAX_STOCK_QUANTITY = 500;
+    private static final DtoValidator VALIDATOR = new DtoValidator();
 
     @Test
     void generateForShop_returnsExactlyOneEntryPerCatalogItem() {
@@ -68,7 +70,41 @@ class ShopEntryGeneratorTest {
                 () -> generator.generateForShop(shopId, SHOP_COUNT, ITEM_CATALOG_SIZE));
     }
 
+    @Test
+    void generateForShop_producesOnlyValidEntriesWhenInvalidGenerationIsOff() {
+        List<ShopEntryDto> entries = generator().generateForShop(1, SHOP_COUNT, ITEM_CATALOG_SIZE);
+
+        assertTrue(entries.stream().allMatch(VALIDATOR::isValid));
+    }
+
+    /* At 100% every itemId gets one invalid row ALONGSIDE its valid one, never instead of it -
+    that is what keeps the valid count at exactly itemCatalogSize whatever the rate is, so
+    plannedRows and the row target stay untouched. */
+    @Test
+    void generateForShop_addsInvalidEntriesWithoutLosingAnyValidOne() {
+        ShopEntryGenerator generator = new ShopEntryGenerator(MAX_STOCK_QUANTITY, 100);
+
+        List<ShopEntryDto> entries = generator.generateForShop(1, SHOP_COUNT, ITEM_CATALOG_SIZE);
+
+        assertEquals(ITEM_CATALOG_SIZE * 2, entries.size());
+        assertEquals(ITEM_CATALOG_SIZE, entries.stream().filter(VALIDATOR::isValid).count());
+    }
+
+    // Every itemId must still appear among the valid rows, otherwise a ShopEntry row would be lost.
+    @Test
+    void generateForShop_stillCoversEveryItemIdWhenInvalidGenerationIsOn() {
+        ShopEntryGenerator generator = new ShopEntryGenerator(MAX_STOCK_QUANTITY, 100);
+
+        List<Integer> validItemIds = generator.generateForShop(1, SHOP_COUNT, ITEM_CATALOG_SIZE).stream()
+                .filter(VALIDATOR::isValid)
+                .map(ShopEntryDto::itemId)
+                .sorted()
+                .toList();
+
+        assertEquals(java.util.stream.IntStream.rangeClosed(1, ITEM_CATALOG_SIZE).boxed().toList(), validItemIds);
+    }
+
     private static ShopEntryGenerator generator() {
-        return new ShopEntryGenerator(MAX_STOCK_QUANTITY);
+        return new ShopEntryGenerator(MAX_STOCK_QUANTITY, 0);
     }
 }

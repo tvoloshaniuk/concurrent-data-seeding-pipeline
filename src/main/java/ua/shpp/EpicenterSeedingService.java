@@ -5,8 +5,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ua.shpp.config.AppConfig;
 import ua.shpp.db.DbRepository;
-import ua.shpp.hibernateValidator.DtoValidator;
+import ua.shpp.validation.DtoValidator;
 import ua.shpp.pipeline.ProducerConsumerPipeline;
+import ua.shpp.utils.CatalogDimensions;
 import ua.shpp.utils.DataPopulator;
 import ua.shpp.utils.ResourceLoader;
 
@@ -45,23 +46,47 @@ public class EpicenterSeedingService {
      */
     public void execute() throws InterruptedException {
         try (DtoValidator validator = new DtoValidator()) {
-            dbRepository.runDdl(ResourceLoader.readText("schema.sql"));
-
-            DataPopulator.PopulationSummary summary = fillFoundationTables(validator);
+            if (shouldPopulate()) {
+                populate(validator);
+            }
             verifyItemTypeExists();
-            fillShopEntryTable(summary, validator);
-
-            findAndLogTopShop("before indexes");
-
-            // Create indexes after data population, not before -- to improve performance
-            dbRepository.runDdl(ResourceLoader.readText("post_load_indexes.sql"));
-
             findAndLogTopShop("after indexes");
         }
     }
 
+    /**
+     * recreate.schema=true always rebuilds, which is what a demo needs to show the whole cycle.
+     * At false the tables are only filled when they are actually empty, so a repeated run against
+     * a database that already holds 3M rows goes straight to the search instead of spending
+     * minutes regenerating identical data.
+     */
+    private boolean shouldPopulate() {
+        if (config.recreateSchema()) {
+            return true;
+        }
+        if (dbRepository.hasShopEntries()) {
+            log.info("recreate.schema=false and ShopEntry already holds data - skipping generation");
+            return false;
+        }
+        log.info("recreate.schema=false but ShopEntry is empty - populating anyway");
+        return true;
+    }
+
+    private void populate(DtoValidator validator) throws InterruptedException {
+        dbRepository.runDdl(ResourceLoader.readText("schema.sql"));
+
+        CatalogDimensions dimensions = fillFoundationTables(validator);
+        verifyItemTypeExists();
+        fillShopEntryTable(dimensions, validator);
+
+        findAndLogTopShop("before indexes");
+
+        // Create indexes after data population, not before -- to improve performance
+        dbRepository.runDdl(ResourceLoader.readText("post_load_indexes.sql"));
+    }
+
     // Fills Shop, ItemType and Item - the three small/sequential tables ShopEntry depends on.
-    private DataPopulator.PopulationSummary fillFoundationTables(DtoValidator validator) {
+    private CatalogDimensions fillFoundationTables(DtoValidator validator) {
         try (
                 InputStream shopAddresses = ResourceLoader.stream("shops.csv");
                 InputStream itemTypes = ResourceLoader.stream("item_types.csv")
@@ -79,11 +104,11 @@ public class EpicenterSeedingService {
      * ProducerConsumerPipeline itself, since only it knows each phase's real start/end - this
      * is just the combined wall-clock total for the whole step.
      */
-    private void fillShopEntryTable(DataPopulator.PopulationSummary summary, DtoValidator validator)
+    private void fillShopEntryTable(CatalogDimensions dimensions, DtoValidator validator)
             throws InterruptedException {
         long startMillis = System.currentTimeMillis();
         new ProducerConsumerPipeline()
-                .execute(dbRepository, validator, config, summary.shopCount(), summary.itemCatalogSize());
+                .execute(dbRepository, validator, config, dimensions);
         log.info("ShopEntry generation+insertion took {} ms", System.currentTimeMillis() - startMillis);
     }
 

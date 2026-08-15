@@ -8,7 +8,8 @@ import ua.shpp.dto.ShopEntryDto;
 import ua.shpp.exceptions.PipelineTaskException;
 import ua.shpp.exceptions.RowCountMismatchException;
 import ua.shpp.generation.ShopEntryGenerator;
-import ua.shpp.hibernateValidator.DtoValidator;
+import ua.shpp.validation.DtoValidator;
+import ua.shpp.utils.CatalogDimensions;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,16 +35,17 @@ public class ProducerConsumerPipeline {
     private static final List<ShopEntryDto> POISON_PILL = new ArrayList<>();
 
     public void execute(DbRepository dbRepository, DtoValidator validator, AppConfig config,
-                        int shopCount, int itemCatalogSize) throws InterruptedException {
-        long plannedRows = (long) shopCount * itemCatalogSize;
+                        CatalogDimensions dimensions) throws InterruptedException {
+        int shopCount = dimensions.shopCount();
+        long plannedRows = (long) shopCount * dimensions.itemCatalogSize();
         log.info("Starting ShopEntry pipeline: shopCount={}, itemCatalogSize={}, plannedRows={}, "
                         + "target={}, producers={}, consumers={}, batchSize={}, queueCapacity={}",
-                shopCount, itemCatalogSize, plannedRows, config.shopEntryTarget(),
+                shopCount, dimensions.itemCatalogSize(), plannedRows, config.shopEntryTarget(),
                 config.producerThreadPoolSize(), config.consumerThreadPoolSize(),
                 config.batchSize(), config.queueCapacity());
 
         BlockingQueue<List<ShopEntryDto>> queue = new ArrayBlockingQueue<>(config.queueCapacity());
-        ShopEntryGenerator generator = new ShopEntryGenerator(config.maxStockQuantity());
+        ShopEntryGenerator generator = new ShopEntryGenerator(config.maxStockQuantity(), config.invalidRatePercent());
         List<Future<Integer>> producerFutures = new ArrayList<>();
         List<Future<Integer>> consumerFutures = new ArrayList<>();
 
@@ -54,8 +56,9 @@ public class ProducerConsumerPipeline {
             // Start Producer
             long producersStartMillis = System.currentTimeMillis();
             for (int shopId = 1; shopId <= shopCount; shopId++) {
-                producerFutures.add(producers.submit(new ShopEntryProducerSubtask(generator, queue, shopId, shopCount,
-                        itemCatalogSize, config.batchSize())));
+                producerFutures.add(producers.submit(
+                        new ShopEntryProducerSubtask(generator, queue, shopId, dimensions, config.batchSize())
+                ));
             }
             log.info("Submitted {} producer tasks (pool size {}), waiting for completion...",
                     shopCount, config.producerThreadPoolSize());
@@ -64,7 +67,8 @@ public class ProducerConsumerPipeline {
             long consumersStartMillis = System.currentTimeMillis();
             for (int i = 0; i < config.consumerThreadPoolSize(); i++) {
                 consumerFutures.add(consumers.submit(
-                        new ShopEntryConsumer(dbRepository, queue, POISON_PILL, validator)));
+                        new ShopEntryConsumer(dbRepository, queue, POISON_PILL, validator)
+                ));
             }
             log.info("Submitted {} consumer tasks (pool size {}), waiting for completion...",
                     config.consumerThreadPoolSize(), config.consumerThreadPoolSize());
@@ -73,13 +77,13 @@ public class ProducerConsumerPipeline {
             long generatedRows;
             long producerMillis;
             try {
-                generatedRows = sumCompleted(producerFutures, "producer");
+                generatedRows = awaitAndSum(producerFutures, "producer");
                 producerMillis = System.currentTimeMillis() - producersStartMillis;
             } finally {
                 sendPoisonPills(queue, config.consumerThreadPoolSize());
             }
 
-            long insertedRows = sumCompleted(consumerFutures, "consumer");
+            long insertedRows = awaitAndSum(consumerFutures, "consumer");
             long consumerMillis = System.currentTimeMillis() - consumersStartMillis;
 
             logSummary(config, generatedRows, insertedRows, producerMillis, consumerMillis);
@@ -108,7 +112,7 @@ public class ProducerConsumerPipeline {
      * InterruptedException is deliberately not caught: it says this waiting thread was asked
      * to stop, not that a worker broke, so wrapping it as a task failure would be a lie.
      */
-    private long sumCompleted(List<Future<Integer>> futures, String role) throws InterruptedException {
+    private long awaitAndSum(List<Future<Integer>> futures, String role) throws InterruptedException {
         long total = 0;
         for (Future<Integer> future : futures) {
             try {
@@ -131,9 +135,12 @@ public class ProducerConsumerPipeline {
          * start-to-finish duration, not two halves of one total - that's why they don't sum
          * to the "generation+insertion took X ms" figure logged by the caller.
          */
-        log.info("Generation: {} rows in {} ms ({} rows/sec). Insertion: {} rows in {} ms ({} rows/sec)",
-                generatedRows, producerMillis, rowsPerSec(generatedRows, producerMillis),
-                insertedRows, consumerMillis, rowsPerSec(insertedRows, consumerMillis));
+        // Guarded because rowsPerSec formats eagerly: with INFO off the work would be thrown away.
+        if (log.isInfoEnabled()) {
+            log.info("Generation: {} rows in {} ms ({} rows/sec). Insertion: {} rows in {} ms ({} rows/sec)",
+                    generatedRows, producerMillis, rowsPerSec(generatedRows, producerMillis),
+                    insertedRows, consumerMillis, rowsPerSec(insertedRows, consumerMillis));
+        }
     }
 
     /**

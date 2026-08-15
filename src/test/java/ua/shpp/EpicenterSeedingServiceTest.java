@@ -29,7 +29,9 @@ class EpicenterSeedingServiceTest {
     void execute_failsBeforeGeneratingShopEntriesWhenItemTypeIsUnknown() {
         when(dbRepository.existsItemType(anyString())).thenReturn(false);
 
-        assertThrows(IllegalArgumentException.class, () -> service().execute());
+        EpicenterSeedingService service = service();
+
+        assertThrows(IllegalArgumentException.class, service::execute);
 
         verify(dbRepository, never()).batchInsertShopEntries(anyList());
     }
@@ -40,8 +42,10 @@ class EpicenterSeedingServiceTest {
     void execute_explainsTheSuffixConventionWhenItemTypeIsUnknown() {
         when(dbRepository.existsItemType(anyString())).thenReturn(false);
 
+        EpicenterSeedingService service = service();
+
         IllegalArgumentException thrown =
-                assertThrows(IllegalArgumentException.class, () -> service().execute());
+                assertThrows(IllegalArgumentException.class, service::execute);
 
         assertTrue(thrown.getMessage().contains("Сантехніка"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("suffix"), thrown.getMessage());
@@ -54,7 +58,9 @@ class EpicenterSeedingServiceTest {
                 .thenAnswer(invocation -> ((List<?>) invocation.getArgument(0)).size());
         when(dbRepository.findShopWithMaxItems(anyString())).thenReturn("Київ, вул. Берковецька 6К");
 
-        assertDoesNotThrow(() -> service().execute());
+        EpicenterSeedingService service = service();
+
+        assertDoesNotThrow(service::execute);
     }
 
     /* A missing top shop is reported, not thrown: the run still produced valid timings, and
@@ -66,7 +72,9 @@ class EpicenterSeedingServiceTest {
                 .thenAnswer(invocation -> ((List<?>) invocation.getArgument(0)).size());
         when(dbRepository.findShopWithMaxItems(anyString())).thenReturn(null);
 
-        assertDoesNotThrow(() -> service().execute());
+        EpicenterSeedingService service = service();
+
+        assertDoesNotThrow(service::execute);
     }
 
     /* Index creation must come after the bulk load, otherwise every inserted row pays for an
@@ -84,6 +92,46 @@ class EpicenterSeedingServiceTest {
         inOrder.verify(dbRepository).runDdl(contains("CREATE INDEX"));
     }
 
+    /* The point of the flag: a repeated run against a database that already holds 3M rows must
+    not spend minutes regenerating identical data before answering the same question. */
+    @Test
+    void execute_skipsGenerationWhenSchemaIsKeptAndDataAlreadyExists() throws Exception {
+        when(dbRepository.hasShopEntries()).thenReturn(true);
+        when(dbRepository.existsItemType(anyString())).thenReturn(true);
+
+        new EpicenterSeedingService(config(false), dbRepository).execute();
+
+        verify(dbRepository, never()).runDdl(anyString());
+        verify(dbRepository, never()).batchInsertShopEntries(anyList());
+        verify(dbRepository).findShopWithMaxItems(anyString());
+    }
+
+    // An empty table is not a reason to skip - there would be nothing to search afterwards.
+    @Test
+    void execute_populatesWhenSchemaIsKeptButTableIsEmpty() throws Exception {
+        when(dbRepository.hasShopEntries()).thenReturn(false);
+        when(dbRepository.existsItemType(anyString())).thenReturn(true);
+        when(dbRepository.batchInsertShopEntries(anyList()))
+                .thenAnswer(invocation -> ((List<?>) invocation.getArgument(0)).size());
+
+        new EpicenterSeedingService(config(false), dbRepository).execute();
+
+        verify(dbRepository, atLeastOnce()).batchInsertShopEntries(anyList());
+    }
+
+    // At recreate.schema=true the table contents are irrelevant - it always rebuilds.
+    @Test
+    void execute_rebuildsWithoutEvenAskingWhenSchemaIsRecreated() throws Exception {
+        when(dbRepository.existsItemType(anyString())).thenReturn(true);
+        when(dbRepository.batchInsertShopEntries(anyList()))
+                .thenAnswer(invocation -> ((List<?>) invocation.getArgument(0)).size());
+
+        service().execute();
+
+        verify(dbRepository, never()).hasShopEntries();
+        verify(dbRepository).runDdl(contains("CREATE TABLE"));
+    }
+
     private EpicenterSeedingService service() {
         return new EpicenterSeedingService(config(), dbRepository);
     }
@@ -91,7 +139,11 @@ class EpicenterSeedingServiceTest {
     /* shopEntryTarget 3000 over the real 57-shop shops.csv gives a 53-item catalog, which must
     still cover the 40 expanded types (20 categories x coefficient 2) that DataPopulator builds. */
     private static AppConfig config() {
+        return config(true);
+    }
+
+    private static AppConfig config(boolean recreateSchema) {
         return new AppConfig("jdbc:unused-by-unit-test", "unused", "unused",
-                100, 2, 2, 500, "Сантехніка 1", 3000, 2, 500);
+                100, 2, 2, 500, 3000, 2, 500, 0, recreateSchema, "Сантехніка 1");
     }
 }

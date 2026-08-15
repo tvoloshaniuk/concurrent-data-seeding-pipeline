@@ -7,7 +7,7 @@ import ua.shpp.db.DbRepository;
 import ua.shpp.dto.ItemDto;
 import ua.shpp.dto.ItemTypeDto;
 import ua.shpp.dto.ShopDto;
-import ua.shpp.hibernateValidator.DtoValidator;
+import ua.shpp.validation.DtoValidator;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -32,22 +32,22 @@ class DataPopulatorTest {
     void fillFoundationTables_reportsShopCountAndDerivedCatalogSize() {
         DataPopulator populator = new DataPopulator(dbRepository, config(30, 2), validator);
 
-        DataPopulator.PopulationSummary summary =
+        CatalogDimensions dimensions =
                 populator.fillFoundationTables(csv(THREE_SHOPS), csv(TWO_TYPES));
 
-        assertEquals(3, summary.shopCount());
+        assertEquals(3, dimensions.shopCount());
         // ceilDiv(30, 3) - rounded up so the pipeline never plans fewer rows than the target
-        assertEquals(10, summary.itemCatalogSize());
+        assertEquals(10, dimensions.itemCatalogSize());
     }
 
     @Test
     void fillFoundationTables_roundsCatalogSizeUpWhenTargetIsNotDivisible() {
         DataPopulator populator = new DataPopulator(dbRepository, config(31, 2), validator);
 
-        DataPopulator.PopulationSummary summary =
+        CatalogDimensions dimensions =
                 populator.fillFoundationTables(csv(THREE_SHOPS), csv(TWO_TYPES));
 
-        assertEquals(11, summary.itemCatalogSize());
+        assertEquals(11, dimensions.itemCatalogSize());
     }
 
     @Test
@@ -101,19 +101,61 @@ class DataPopulatorTest {
     }
 
     @Test
-    void fillFoundationTables_throwsWhenShopsCsvHasTooFewRows() {
+    void fillFoundationTables_throwsWhenShopsCsvHasNoRows() {
         DataPopulator populator = new DataPopulator(dbRepository, config(30, 2), validator);
+        InputStream emptyShops = csv("address\n");
+        InputStream types = csv(TWO_TYPES);
 
-        assertThrows(IllegalStateException.class,
-                () -> populator.fillFoundationTables(csv("address\nКиїв 1"), csv(TWO_TYPES)));
+        assertThrows(IllegalStateException.class, () -> populator.fillFoundationTables(emptyShops, types));
     }
 
     @Test
-    void fillFoundationTables_throwsWhenItemTypesCsvHasTooFewRows() {
+    void fillFoundationTables_throwsWhenItemTypesCsvHasNoRows() {
+        DataPopulator populator = new DataPopulator(dbRepository, config(30, 2), validator);
+        InputStream shops = csv(THREE_SHOPS);
+        InputStream emptyTypes = csv("name\n");
+
+        assertThrows(IllegalStateException.class, () -> populator.fillFoundationTables(shops, emptyTypes));
+    }
+
+    /* A single shop is a legitimate setup, not a broken file: itemCatalogSize is derived from
+    shopCount, so it simply grows to 30 and the row target still holds. */
+    @Test
+    void fillFoundationTables_acceptsASingleShop() {
         DataPopulator populator = new DataPopulator(dbRepository, config(30, 2), validator);
 
-        assertThrows(IllegalStateException.class,
-                () -> populator.fillFoundationTables(csv(THREE_SHOPS), csv("name\nПлитка")));
+        CatalogDimensions dimensions =
+                populator.fillFoundationTables(csv("address\nКиїв 1"), csv(TWO_TYPES));
+
+        assertEquals(1, dimensions.shopCount());
+        assertEquals(30, dimensions.itemCatalogSize());
+    }
+
+    /* The whole reason generation retries instead of filtering: invalid generation must not shrink the
+    catalogue. Fewer items than itemCatalogSize would leave ShopEntryGenerator enumerating item
+    ids the database never assigned, and every such row would break the foreign key. */
+    @Test
+    void fillFoundationTables_stillDeliversTheFullCatalogueWhenInvalidGenerationIsOn() {
+        DataPopulator populator = new DataPopulator(dbRepository, config(30, 2, 50), validator);
+
+        CatalogDimensions dimensions =
+                populator.fillFoundationTables(csv(THREE_SHOPS), csv(TWO_TYPES));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<ItemDto>> captor = ArgumentCaptor.forClass(List.class);
+        verify(dbRepository).batchInsertItems(captor.capture());
+        assertEquals(dimensions.itemCatalogSize(), captor.getValue().size());
+        assertTrue(captor.getValue().stream().allMatch(validator::isValid));
+    }
+
+    // A 100% invalid rate can never fill the catalogue, so it fails with a bounded number of tries.
+    @Test
+    void fillFoundationTables_throwsWhenEveryCandidateIsInvalid() {
+        DataPopulator populator = new DataPopulator(dbRepository, config(30, 2, 100), validator);
+        InputStream shops = csv(THREE_SHOPS);
+        InputStream types = csv(TWO_TYPES);
+
+        assertThrows(IllegalStateException.class, () -> populator.fillFoundationTables(shops, types));
     }
 
     /* Too many types for too small a catalog would leave types with no items at all, so this
@@ -121,16 +163,21 @@ class DataPopulatorTest {
     @Test
     void fillFoundationTables_throwsWhenCatalogTooSmallToCoverEveryType() {
         DataPopulator populator = new DataPopulator(dbRepository, config(6, 5), validator);
+        InputStream shops = csv(THREE_SHOPS);
+        InputStream types = csv(TWO_TYPES);
 
-        assertThrows(IllegalStateException.class,
-                () -> populator.fillFoundationTables(csv(THREE_SHOPS), csv(TWO_TYPES)));
+        assertThrows(IllegalStateException.class, () -> populator.fillFoundationTables(shops, types));
     }
 
     private static AppConfig config(int shopEntryTarget, int typeIncreaseCoefficient) {
+        return config(shopEntryTarget, typeIncreaseCoefficient, 0);
+    }
+
+    private static AppConfig config(int shopEntryTarget, int typeIncreaseCoefficient, int invalidRatePercent) {
         // Credentials only have to be non-blank - nothing here ever opens a connection.
         return new AppConfig("jdbc:unused-by-unit-test", "unused", "unused",
-                5000, 2, 4, 500, "Плитка 1",
-                shopEntryTarget, typeIncreaseCoefficient, 500);
+                5000, 2, 4, 500,
+                shopEntryTarget, typeIncreaseCoefficient, 500, invalidRatePercent, true, "Плитка 1");
     }
 
     private static InputStream csv(String content) {

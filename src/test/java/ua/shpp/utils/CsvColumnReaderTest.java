@@ -10,25 +10,29 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/* Not tests of commons-csv but of the four choices made when configuring it - setHeader,
+setSkipHeaderRecord, setTrim and get(0). Flip any of them and the library still works perfectly
+while this class starts returning the header row, the wrong column, or padded values. That is
+what these pin down. */
 class CsvColumnReaderTest {
 
     @Test
-    void readSingleColumn_skipsHeaderRow() {
-        List<String> values = CsvColumnReader.readSingleColumn(csv("name\nПлитка\nПосуд"));
+    void readFirstColumn_skipsHeaderRow() {
+        List<String> values = CsvColumnReader.readFirstColumn(csv("name\nПлитка\nПосуд"));
 
         assertEquals(List.of("Плитка", "Посуд"), values);
     }
 
     @Test
-    void readSingleColumn_ignoresEveryColumnButTheFirst() {
-        List<String> values = CsvColumnReader.readSingleColumn(csv("name,note\nПлитка,ignored\nПосуд,also ignored"));
+    void readFirstColumn_ignoresEveryColumnButTheFirst() {
+        List<String> values = CsvColumnReader.readFirstColumn(csv("name,note\nПлитка,ignored\nПосуд,also ignored"));
 
         assertEquals(List.of("Плитка", "Посуд"), values);
     }
 
     @Test
-    void readSingleColumn_trimsSurroundingWhitespace() {
-        List<String> values = CsvColumnReader.readSingleColumn(csv("name\n   Плитка   "));
+    void readFirstColumn_trimsSurroundingWhitespace() {
+        List<String> values = CsvColumnReader.readFirstColumn(csv("name\n   Плитка   "));
 
         assertEquals(List.of("Плитка"), values);
     }
@@ -36,15 +40,15 @@ class CsvColumnReaderTest {
     /* Quoting is what lets an address hold a comma without splitting into two columns -
     handled by CSVFormat, which is the reason this class exists instead of String.split(","). */
     @Test
-    void readSingleColumn_keepsCommasInsideQuotedValues() {
-        List<String> values = CsvColumnReader.readSingleColumn(csv("address\n\"Київ, вул. Берковецька 6К\""));
+    void readFirstColumn_keepsCommasInsideQuotedValues() {
+        List<String> values = CsvColumnReader.readFirstColumn(csv("address\n\"Київ, вул. Берковецька 6К\""));
 
         assertEquals(List.of("Київ, вул. Берковецька 6К"), values);
     }
 
     @Test
-    void readSingleColumn_returnsEmptyWhenOnlyHeaderPresent() {
-        List<String> values = CsvColumnReader.readSingleColumn(csv("name\n"));
+    void readFirstColumn_returnsEmptyWhenOnlyHeaderPresent() {
+        List<String> values = CsvColumnReader.readFirstColumn(csv("name\n"));
 
         assertTrue(values.isEmpty());
     }

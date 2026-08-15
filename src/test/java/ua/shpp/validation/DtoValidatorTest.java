@@ -1,4 +1,4 @@
-package ua.shpp.hibernateValidator;
+package ua.shpp.validation;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -59,13 +59,42 @@ class DtoValidatorTest {
         assertFalse(validator.isValid(new ItemTypeDto("")));
     }
 
+    /* A lowercase category in item_types.csv is a typo, not a style choice - every real entry
+    there is a proper noun. */
+    @Test
+    void isValid_rejectsItemTypeNameWithoutLeadingCapital() {
+        assertFalse(validator.isValid(new ItemTypeDto("сантехніка 1")));
+    }
+
     @Test
     void isValid_acceptsWellFormedItem() {
-        assertTrue(validator.isValid(new ItemDto(1, "0f8c1e2a-3b4d-5e6f-7a8b-9c0d1e2f3a4b", 1)));
+        assertTrue(validator.isValid(new ItemDto("Товар-42", 1)));
+    }
+
+    /* Each of these mirrors one invalid-generation mode in ItemGenerator, so together they prove every
+    mode it can produce is genuinely rejected rather than slipping through. */
+    @Test
+    void isValid_rejectsBlankItemName() {
+        assertFalse(validator.isValid(new ItemDto("", 1)));
     }
 
     @Test
     void isValid_rejectsItemNameShorterThanMinimum() {
-        assertFalse(validator.isValid(new ItemDto(1, "ab", 1)));
+        assertFalse(validator.isValid(new ItemDto("То", 1)));
+    }
+
+    @Test
+    void isValid_rejectsItemNameWithoutLeadingCapital() {
+        assertFalse(validator.isValid(new ItemDto("товар-42", 1)));
+    }
+
+    @Test
+    void isValid_rejectsItemNameStartingWithWhitespace() {
+        assertFalse(validator.isValid(new ItemDto(" Товар-42", 1)));
+    }
+
+    @Test
+    void isValid_rejectsNonPositiveItemTypeId() {
+        assertFalse(validator.isValid(new ItemDto("Товар-42", 0)));
     }
 }

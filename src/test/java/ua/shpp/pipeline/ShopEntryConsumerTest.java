@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import ua.shpp.db.DbRepository;
 import ua.shpp.dto.ShopEntryDto;
-import ua.shpp.hibernateValidator.DtoValidator;
+import ua.shpp.validation.DtoValidator;
 
 import java.util.ArrayList;
 import java.util.Arrays;
