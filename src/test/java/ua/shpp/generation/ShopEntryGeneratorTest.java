@@ -6,6 +6,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import ua.shpp.dto.ShopEntryDto;
 import ua.shpp.validation.DtoValidator;
 
+import java.util.IntSummaryStatistics;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -44,17 +45,19 @@ class ShopEntryGeneratorTest {
         assertTrue(entries.stream().allMatch(entry -> entry.shopId() == shopId));
     }
 
-    // 0 is a legitimate value (listed, out of stock), so the lower bound is inclusive too.
-    /* The IDE reads @Min(0) as a promise and calls the lower bound redundant, but the annotation
-    only declares - nothing enforces it at construction, and this same generator emits -1 on
-    purpose once the invalid rate is on. Both bounds are therefore checked for real. */
-    @SuppressWarnings("DataFlowIssue")
+    /* 0 is a legitimate value (listed, out of stock), so the lower bound is inclusive too.
+    Summarised into plain ints first: comparing entry.itemCount() inline makes the IDE trust
+    @Min(0) as a guarantee and call the lower bound redundant, when in fact nothing enforces the
+    annotation at construction - this same generator emits -1 on purpose once the invalid rate is
+    on. Reading through getMin/getMax keeps both bounds genuinely checked. */
     @Test
     void generateForShop_keepsItemCountWithinConfiguredBounds() {
         List<ShopEntryDto> entries = generator().generateForShop(1, SHOP_COUNT, ITEM_CATALOG_SIZE);
 
-        assertTrue(entries.stream()
-                .allMatch(entry -> entry.itemCount() >= 0 && entry.itemCount() <= MAX_STOCK_QUANTITY));
+        IntSummaryStatistics counts = entries.stream().mapToInt(ShopEntryDto::itemCount).summaryStatistics();
+
+        assertTrue(counts.getMin() >= 0, "itemCount went below 0: " + counts.getMin());
+        assertTrue(counts.getMax() <= MAX_STOCK_QUANTITY, "itemCount exceeded the bound: " + counts.getMax());
     }
 
     @Test
