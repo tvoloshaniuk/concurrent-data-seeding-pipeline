@@ -93,6 +93,9 @@ class DtoValidatorTest {
         assertFalse(validator.isValid(new ItemDto(" Товар-42", 1)));
     }
 
+    /* Suppressed rather than obeyed: the IDE reads @Positive as a constructor contract, but the
+    annotation only declares - building a violating record is the very thing under test here. */
+    @SuppressWarnings("DataFlowIssue")
     @Test
     void isValid_rejectsNonPositiveItemTypeId() {
         assertFalse(validator.isValid(new ItemDto("Товар-42", 0)));

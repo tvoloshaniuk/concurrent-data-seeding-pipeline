@@ -50,7 +50,9 @@ class ShopEntryProducerSubtaskTest {
         subtask(1, 3, 500).call();
 
         assertEquals(1, queue.size());
-        assertEquals(3, queue.peek().size());
+        // element() rather than peek(): it throws on an empty queue instead of returning null,
+        // so a regression shows up as a failed test rather than an NPE with no context.
+        assertEquals(3, queue.element().size());
     }
 
     @Test

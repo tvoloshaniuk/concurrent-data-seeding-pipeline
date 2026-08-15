@@ -49,6 +49,9 @@ class ShopEntryGeneratorTest {
     void generateForShop_keepsItemCountWithinConfiguredBounds() {
         List<ShopEntryDto> entries = generator().generateForShop(1, SHOP_COUNT, ITEM_CATALOG_SIZE);
 
+        /* The IDE reads @Min(0) as a promise and calls the lower bound redundant, but the
+        annotation is only a declaration - nothing enforces it at construction, and the generator
+        does emit -1 on purpose when the invalid rate is on. Both bounds are checked for real. */
         assertTrue(entries.stream()
                 .allMatch(entry -> entry.itemCount() >= 0 && entry.itemCount() <= MAX_STOCK_QUANTITY));
     }

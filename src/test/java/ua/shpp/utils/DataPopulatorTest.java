@@ -20,6 +20,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+/* ByteArrayInputStream holds no OS handle and its close() is a no-op, so the IDE's
+try-with-resources hint buys nothing here and would only bury the tests in nesting. */
+@SuppressWarnings("resource")
 class DataPopulatorTest {
     private static final String THREE_SHOPS = "address\nКиїв 1\nЛьвів 2\nОдеса 3";
     private static final String TWO_TYPES = "name\nПлитка\nПосуд";

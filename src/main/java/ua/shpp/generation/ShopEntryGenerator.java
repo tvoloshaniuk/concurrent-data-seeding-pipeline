@@ -58,7 +58,15 @@ public class ShopEntryGenerator {
         return random.nextInt(100) < invalidRatePercent;
     }
 
-    // Each variant breaks exactly one rule on ShopEntryDto, so neither can pass validation.
+    /**
+     * Each variant breaks exactly one rule on ShopEntryDto, so neither can pass validation.
+     * <p>
+     * The IDE flags both calls as "always fails" because it reads @Min/@Positive as a contract on
+     * the constructor. It is not one - Bean Validation annotations only describe, nothing rejects
+     * these values at construction time. Producing records that violate the declaration is exactly
+     * the job of this method, so the warning is suppressed rather than obeyed.
+     */
+    @SuppressWarnings("DataFlowIssue")
     private ShopEntryDto invalidEntry(int itemId, int shopId) {
         return random.nextBoolean()
                 ? new ShopEntryDto(itemId, shopId, -1)   // @Min(0) on itemCount

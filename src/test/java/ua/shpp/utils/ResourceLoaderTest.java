@@ -10,6 +10,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+// The stream under test is asserted on, not consumed - closing it would be the test's only act.
+@SuppressWarnings("resource")
 class ResourceLoaderTest {
     private static final String MISSING = "definitely-not-on-the-classpath.txt";
 

@@ -80,6 +80,7 @@ class ShopEntryConsumerTest {
     }
 
     @Test
+    @SuppressWarnings("DataFlowIssue") // @Positive is a declaration, not a constructor guard
     void call_dropsInvalidEntriesBeforeHandingTheBatchToTheRepository() throws Exception {
         when(dbRepository.batchInsertShopEntries(anyList())).thenReturn(1);
         ShopEntryDto valid = new ShopEntryDto(1, 1, 5);
