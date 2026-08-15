@@ -36,8 +36,8 @@ public record AppConfig(
         requirePositive(shopEntryTarget, "shopEntryTarget");
         requirePositive(typeIncreaseCoefficient, "typeIncreaseCoefficient");
         requirePositive(maxStockQuantity, "maxStockQuantity");
-        // Not requirePositive: 0 is the normal production setting, meaning "corrupt nothing".
-        requireInRange(invalidRatePercent, 0, 100, "invalidRatePercent");
+        // Not requirePositive: 0 is the normal production setting, meaning "generate nothing invalid".
+        requireValidPercent(invalidRatePercent);
         requireNotBlank(itemType, "itemType");
     }
 
@@ -107,6 +107,7 @@ public record AppConfig(
      * turns a typo like "yes" into false - exactly the sort of quiet wrong answer this config is
      * meant to prevent.
      */
+    @SuppressWarnings("SameParameterValue") // one boolean property today, but this is a parser like requiredInt
     private static boolean requiredBoolean(Properties properties, String key) {
         String value = requiredString(properties, key);
         if (!"true".equalsIgnoreCase(value) && !"false".equalsIgnoreCase(value)) {
@@ -127,9 +128,15 @@ public record AppConfig(
         }
     }
 
-    private static void requireInRange(int value, int min, int max, String name) {
-        if (value < min || value > max) {
-            throw new IllegalArgumentException(name + " must be within [" + min + ", " + max + "]");
+    /**
+     * Deliberately specific rather than a general requireInRange(value, min, max, name): there is
+     * exactly one percentage here, so bounds-as-parameters would be generality nothing asks for.
+     * requireNotBlank and requirePositive stay general because they really are called for many
+     * different fields.
+     */
+    private static void requireValidPercent(int value) {
+        if (value < 0 || value > 100) {
+            throw new IllegalArgumentException("invalidRatePercent must be within [0, 100]");
         }
     }
 }
