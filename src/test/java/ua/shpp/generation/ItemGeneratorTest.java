@@ -9,9 +9,7 @@ import java.util.stream.IntStream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/* The two ends of the scale are what make the validator provably useful: at 0 it must never
-fire, at 100 it must always fire. Same shape as CitizenDataGenerator.generateRandomPojo(0/100)
-in pract3. */
+// At invalidRatePercent 0 the generator must never corrupt, at 100 it must always corrupt.
 class ItemGeneratorTest {
     private final DtoValidator validator = new DtoValidator();
 
@@ -49,8 +47,7 @@ class ItemGeneratorTest {
         assertEquals(7, item.typeId());
     }
 
-    /* Names are what Item(name) UNIQUE relies on, so distinct sequence numbers must never
-    collide - the reason a counter is used rather than random strings. */
+    // Item(name) UNIQUE relies on distinct sequence numbers never colliding.
     @Test
     void generate_givesDistinctNamesToDistinctSequenceNumbers() {
         ItemGenerator generator = new ItemGenerator(0);

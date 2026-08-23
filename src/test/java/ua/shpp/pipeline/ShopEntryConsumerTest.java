@@ -29,11 +29,7 @@ class ShopEntryConsumerTest {
     // Real, not mocked: the invalid-entry test depends on the actual Bean Validation rules.
     private final DtoValidator validator = new DtoValidator();
 
-    /*
-     * Mock the situation that the first batch inserted all entries, but the second batch lost a row to
-     * ON CONFLICT DO NOTHING.
-     * The consumer must report the sum of rows the repository reports inserted, not the sum of rows it was given.
-     */
+    // First batch inserts both rows, second loses one to ON CONFLICT DO NOTHING.
     @Test
     void call_returnsTheSumOfRowsTheRepositoryReportsInserted() throws Exception {
         when(dbRepository.batchInsertShopEntries(anyList())).thenReturn(
@@ -62,8 +58,6 @@ class ShopEntryConsumerTest {
         assertEquals(1, queue.size());
     }
 
-    /* A failed insert must not end the consumer: a dead consumer never takes its poison pill,
-    which would leave the pipeline waiting on it forever. */
     @Test
     void call_keepsConsumingAfterAFailedBatchAndExcludesItsRows() throws Exception {
         when(dbRepository.batchInsertShopEntries(anyList()))
@@ -80,7 +74,7 @@ class ShopEntryConsumerTest {
     }
 
     @Test
-    @SuppressWarnings("DataFlowIssue") // @Positive is a declaration, not a constructor guard
+    @SuppressWarnings("DataFlowIssue")
     void call_dropsInvalidEntriesBeforeHandingTheBatchToTheRepository() throws Exception {
         when(dbRepository.batchInsertShopEntries(anyList())).thenReturn(1);
         ShopEntryDto valid = new ShopEntryDto(1, 1, 5);
@@ -103,8 +97,6 @@ class ShopEntryConsumerTest {
         assertEquals(0, consumer().call());
     }
 
-    /* An equal-valued list must not be mistaken for the sentinel, otherwise a real batch
-    could stop the consumer early - this is why POISON_PILL is compared with == not equals(). */
     @Test
     void call_treatsAnEmptyDataBatchAsDataRatherThanTheSentinel() throws Exception {
         queue.put(new ArrayList<>());

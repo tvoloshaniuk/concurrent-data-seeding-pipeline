@@ -7,8 +7,8 @@ import jakarta.validation.ValidatorFactory;
 /**
  * Checks validity of dto before insertion into DB tables in following cases:
  *  1) fundamental data, needed for generation of random (fail-fast if invalid);
- *      - reading of valid shops and itemTypes from CSV files;
- *      - generation of valid items;
+ *      - reading of shops and itemTypes from CSV files;
+ *      - generation of items;
  *  2) generated shopEntries by Producer and validated in Consumer;
  * One instance of validator is used in the whole application, including multithreaded pipelines,
  * so it is created once in try-with-resources and closed on application shutdown.

@@ -22,16 +22,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 /**
+ * Fills in the final ShopEntry table (3M+ rows) via a producer/consumer pipeline.
  * Orchestration only: sets up the queue and thread pools, starts ShopEntryProducerSubtask/
  * ShopEntryConsumer workers, coordinates shutdown via poison pills, logs the summary.
  * Producer/consumer logic itself lives in their own classes.
- * <p>
- * Holds no mutable state: every count comes back through the workers' Futures, so the same
- * instance can be executed twice without carrying numbers over from the previous run.
  */
 public class ProducerConsumerPipeline {
     private static final Logger log = LoggerFactory.getLogger(ProducerConsumerPipeline.class);
-    // Unique sentinel instance (not List.of()) so reference equality (==) is reliable.
     private static final List<ShopEntryDto> POISON_PILL = new ArrayList<>();
 
     public void execute(DbRepository dbRepository, DtoValidator validator, AppConfig config,
@@ -53,7 +50,7 @@ public class ProducerConsumerPipeline {
                 ExecutorService producers = Executors.newFixedThreadPool(config.producerThreadPoolSize());
                 ExecutorService consumers = Executors.newFixedThreadPool(config.consumerThreadPoolSize())
         ) {
-            // Start Producer
+            // Start Producers
             long producersStartMillis = System.currentTimeMillis();
             for (int shopId = 1; shopId <= shopCount; shopId++) {
                 producerFutures.add(producers.submit(
@@ -63,7 +60,7 @@ public class ProducerConsumerPipeline {
             log.info("Submitted {} producer tasks (pool size {}), waiting for completion...",
                     shopCount, config.producerThreadPoolSize());
 
-            // Start Consumer
+            // Start Consumers
             long consumersStartMillis = System.currentTimeMillis();
             for (int i = 0; i < config.consumerThreadPoolSize(); i++) {
                 consumerFutures.add(consumers.submit(
@@ -73,7 +70,7 @@ public class ProducerConsumerPipeline {
             log.info("Submitted {} consumer tasks (pool size {}), waiting for completion...",
                     config.consumerThreadPoolSize(), config.consumerThreadPoolSize());
 
-            // Wait Producer -> Send PoisonPills -> Wait Consumer.
+            // Wait Producers -> Send PoisonPills -> Wait Consumers.
             long generatedRows;
             long producerMillis;
             try {
@@ -99,18 +96,8 @@ public class ProducerConsumerPipeline {
     }
 
     /**
-     * Blocks until every worker of this role has finished and returns the total they report -
-     * rows generated for producers, rows inserted for consumers. Both are measured rather
-     * than assumed, so the summary never claims work that did not happen.
-     * <p>
-     * A failure is rethrown instead of vanishing inside an unwatched Future. Failing fast is
-     * deliberate: a dead worker (e.g. the shopId-range guard in ShopEntryGenerator) means the
-     * data set is already incomplete, so carrying on would only hide that. Batch-level insert
-     * failures are the separate, tolerated case - ShopEntryConsumer swallows those on purpose
-     * and they never reach here.
-     * <p>
-     * InterruptedException is deliberately not caught: it says this waiting thread was asked
-     * to stop, not that a worker broke, so wrapping it as a task failure would be a lie.
+     * Returns the total of: rows generated for producers; rows inserted for consumers.
+     * Blocks until every worker of this role has finished.
      */
     private long awaitAndSum(List<Future<Integer>> futures, String role) throws InterruptedException {
         long total = 0;
@@ -129,25 +116,14 @@ public class ProducerConsumerPipeline {
         log.info("Pipeline finished: generated={}, inserted={}, target={}",
                 generatedRows, insertedRows, config.shopEntryTarget());
 
-        /*
-         * Producer and consumer phases overlap in wall time (consumers start early and drain
-         * the queue while producers are still generating), so these are each phase's own
-         * start-to-finish duration, not two halves of one total - that's why they don't sum
-         * to the "generation+insertion took X ms" figure logged by the caller.
-         */
-        // Guarded because rowsPerSec formats eagerly: with INFO off the work would be thrown away.
-        if (log.isInfoEnabled()) {
-            log.info("Generation: {} rows in {} ms ({} rows/sec). Insertion: {} rows in {} ms ({} rows/sec)",
-                    generatedRows, producerMillis, rowsPerSec(generatedRows, producerMillis),
-                    insertedRows, consumerMillis, rowsPerSec(insertedRows, consumerMillis));
-        }
+        log.info("Generation: {} rows in {} ms ({} rows/sec). Insertion: {} rows in {} ms ({} rows/sec)",
+                generatedRows, producerMillis, rowsPerSec(generatedRows, producerMillis),
+                insertedRows, consumerMillis, rowsPerSec(insertedRows, consumerMillis));
     }
 
     /**
-     * Runs after the summary is logged, so the throughput numbers are on record even when
-     * this aborts the run. Individual batch failures are tolerated as they happen, but the
-     * task requires at least shopEntryTarget rows in the end - a shortfall means the data
-     * set is unusable for the search, and that is only knowable from the final count.
+     * Required at least shopEntryTarget rows in the end - a shortfall means the data
+     * set is unusable for the search.
      */
     private void verifyTargetReached(AppConfig config, long insertedRows) {
         if (insertedRows < config.shopEntryTarget()) {
@@ -158,7 +134,7 @@ public class ProducerConsumerPipeline {
         }
     }
 
-    /**
+    /** todo
      * %.1f gives one decimal place; Locale.ROOT pins the decimal separator to "." regardless
      * of the JVM's default locale, so log output reads the same on every machine (some
      * locales format decimals with ","). millis <= 0 is a genuine "too fast to measure" case

@@ -7,6 +7,7 @@ import ua.shpp.utils.ResourceLoader;
 import java.util.Properties;
 
 public record AppConfig(
+        // Comes from config.properties:
         String dbUrl,
         String dbUser,
         String dbPassword,
@@ -19,11 +20,12 @@ public record AppConfig(
         int maxStockQuantity,
         int invalidRatePercent,
         boolean recreateSchema,
-        // Last on purpose: everything above mirrors config.properties in file order, this one
-        // alone comes from args[0], so keeping it out of that block makes the two easy to compare.
+        // Comes from args[0]:
         String itemType
 ) {
     private static final Logger log = LoggerFactory.getLogger(AppConfig.class);
+
+    private static final int MAX_INVALID_RATE_PERCENT = 99;
 
     public AppConfig {
         requireNotBlank(dbUrl, "dbUrl");
@@ -36,11 +38,11 @@ public record AppConfig(
         requirePositive(shopEntryTarget, "shopEntryTarget");
         requirePositive(typeIncreaseCoefficient, "typeIncreaseCoefficient");
         requirePositive(maxStockQuantity, "maxStockQuantity");
-        // Not requirePositive: 0 is the normal production setting, meaning "generate nothing invalid".
-        requireValidPercent(invalidRatePercent);
+        requireInvalidRateInRange(invalidRatePercent);
         requireNotBlank(itemType, "itemType");
     }
 
+    //loads from 2 sources: config.properties and args[0] (itemType) and returns AppConfig instance
     public static AppConfig load(String[] args) {
         Properties properties = ResourceLoader.readProperties("config.properties");
         AppConfig config = new AppConfig(
@@ -61,7 +63,8 @@ public record AppConfig(
         log.info(
                 "Loaded config: dbUrl={}, dbUser={}, queueCapacity={}, producerThreadPoolSize={}, "
                         + "consumerThreadPoolSize={}, batchSize={}, itemType={}, shopEntryTarget={}, "
-                        + "typeIncreaseCoefficient={}, maxStockQuantity={}",
+                        + "typeIncreaseCoefficient={}, maxStockQuantity={}, invalidRatePercent={}, "
+                        + "recreateSchema={}",
                 config.dbUrl(),
                 config.dbUser(),
                 config.queueCapacity(),
@@ -71,7 +74,9 @@ public record AppConfig(
                 config.itemType(),
                 config.shopEntryTarget(),
                 config.typeIncreaseCoefficient(),
-                config.maxStockQuantity()
+                config.maxStockQuantity(),
+                config.invalidRatePercent(),
+                config.recreateSchema()
         );
         return config;
     }
@@ -93,7 +98,7 @@ public record AppConfig(
         return value;
     }
 
-    // Based on requiredString() to separate "missing key" a "wrong value" problems
+    // Based on requiredString() to separate "missing key" and "wrong value" problems
     private static int requiredInt(Properties properties, String key) {
         try {
             return Integer.parseInt(requiredString(properties, key));
@@ -102,18 +107,22 @@ public record AppConfig(
         }
     }
 
-    /**
-     * Rejects anything but "true"/"false" instead of using Boolean.parseBoolean, which silently
-     * turns a typo like "yes" into false - exactly the sort of quiet wrong answer this config is
-     * meant to prevent.
+    /** todo
+     * Written by hand because the JDK offers nothing that fails on a bad boolean: parseBoolean and
+     * valueOf never throw, they just return false for "yes", "1" or a typo. There is therefore no
+     * exception to catch and no parser to delegate to - the only way to reject the value is to name
+     * the two strings that are allowed.
      */
-    @SuppressWarnings("SameParameterValue") // one boolean property today, but this is a parser like requiredInt
+    @SuppressWarnings("SameParameterValue")
     private static boolean requiredBoolean(Properties properties, String key) {
         String value = requiredString(properties, key);
-        if (!"true".equalsIgnoreCase(value) && !"false".equalsIgnoreCase(value)) {
-            throw new IllegalArgumentException("Invalid boolean property: " + key + " = " + value);
+        if ("true".equalsIgnoreCase(value)) {
+            return true;
         }
-        return Boolean.parseBoolean(value);
+        if ("false".equalsIgnoreCase(value)) {
+            return false;
+        }
+        throw new IllegalArgumentException("Invalid boolean property: " + key + " = " + value);
     }
 
     private static void requireNotBlank(String value, String name) {
@@ -128,15 +137,10 @@ public record AppConfig(
         }
     }
 
-    /**
-     * Deliberately specific rather than a general requireInRange(value, min, max, name): there is
-     * exactly one percentage here, so bounds-as-parameters would be generality nothing asks for.
-     * requireNotBlank and requirePositive stay general because they really are called for many
-     * different fields.
-     */
-    private static void requireValidPercent(int value) {
-        if (value < 0 || value > 100) {
-            throw new IllegalArgumentException("invalidRatePercent must be within [0, 100]");
+    private static void requireInvalidRateInRange(int value) {
+        if (value < 0 || value > MAX_INVALID_RATE_PERCENT) {
+            throw new IllegalArgumentException(
+                    "invalidRatePercent must be within [0, " + MAX_INVALID_RATE_PERCENT + "]");
         }
     }
 }

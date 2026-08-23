@@ -8,7 +8,7 @@ import ua.shpp.db.DbRepository;
 import ua.shpp.validation.DtoValidator;
 import ua.shpp.pipeline.ProducerConsumerPipeline;
 import ua.shpp.utils.CatalogDimensions;
-import ua.shpp.utils.DataPopulator;
+import ua.shpp.utils.FoundationTablesPopulator;
 import ua.shpp.utils.ResourceLoader;
 
 import javax.sql.DataSource;
@@ -18,7 +18,7 @@ import java.io.InputStream;
 /**
  * Owns the whole seed-and-search flow: create schema, fill the four tables (Shop, ItemType,
  * Item, ShopEntry), build indexes, then search for the top shop. main() just constructs one
- * instance and calls execute() - every actual step lives here as an instance method.
+ * instance and calls execute().
  */
 public class EpicenterSeedingService {
     private static final Logger log = LoggerFactory.getLogger(EpicenterSeedingService.class);
@@ -30,37 +30,22 @@ public class EpicenterSeedingService {
         this(config, new DbRepository(initDatasource(config)));
     }
 
-    /**
-     * Package-private so tests can inject a stand-in repository: the public constructor wires
-     * a real PGSimpleDataSource, which would make every test of this class need a database.
-     */
     EpicenterSeedingService(AppConfig config, DbRepository dbRepository) {
         this.config = config;
         this.dbRepository = dbRepository;
     }
 
-    /**
-     * Owns the validator's lifetime because its useful life is exactly one run: created here,
-     * shared by the populator and every consumer thread, and closed on the way out even if a
-     * step throws. Nothing outside this method can be left holding a closed factory.
-     */
     public void execute() throws InterruptedException {
         try (DtoValidator validator = new DtoValidator()) {
-            if (shouldPopulate()) {
-                populate(validator);
+            if (shouldSeed()) {
+                seed(validator);
             }
-            verifyItemTypeExists();
+            verifyItemTypeIsSearchable();
             findAndLogTopShop("after indexes");
         }
     }
 
-    /**
-     * recreate.schema=true always rebuilds, which is what a demo needs to show the whole cycle.
-     * At false the tables are only filled when they are actually empty, so a repeated run against
-     * a database that already holds 3M rows goes straight to the search instead of spending
-     * minutes regenerating identical data.
-     */
-    private boolean shouldPopulate() {
+    private boolean shouldSeed() {
         if (config.recreateSchema()) {
             return true;
         }
@@ -68,15 +53,15 @@ public class EpicenterSeedingService {
             log.info("recreate.schema=false and ShopEntry already holds data - skipping generation");
             return false;
         }
-        log.info("recreate.schema=false but ShopEntry is empty - populating anyway");
+        log.info("recreate.schema=false but ShopEntry is empty - seeding anyway"); //todo
         return true;
     }
 
-    private void populate(DtoValidator validator) throws InterruptedException {
+    private void seed(DtoValidator validator) throws InterruptedException {
         dbRepository.runDdl(ResourceLoader.readText("schema.sql"));
 
         CatalogDimensions dimensions = fillFoundationTables(validator);
-        verifyItemTypeExists();
+        verifyItemTypeIsSearchable();
         fillShopEntryTable(dimensions, validator);
 
         findAndLogTopShop("before indexes");
@@ -91,8 +76,8 @@ public class EpicenterSeedingService {
                 InputStream shopAddresses = ResourceLoader.stream("shops.csv");
                 InputStream itemTypes = ResourceLoader.stream("item_types.csv")
         ) {
-            DataPopulator populator = new DataPopulator(dbRepository, config, validator);
-            return populator.fillFoundationTables(shopAddresses, itemTypes);
+            FoundationTablesPopulator populator = new FoundationTablesPopulator(dbRepository, config, validator);
+            return populator.populate(shopAddresses, itemTypes);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -100,9 +85,7 @@ public class EpicenterSeedingService {
 
     /**
      * Fills the final, largest table (ShopEntry, 3M+ rows) via the parallel pipeline.
-     * Producer (generation) vs consumer (insertion) timing/throughput is broken out inside
-     * ProducerConsumerPipeline itself, since only it knows each phase's real start/end - this
-     * is just the combined wall-clock total for the whole step.
+     * Producer (generation) vs consumer (insertion).
      */
     private void fillShopEntryTable(CatalogDimensions dimensions, DtoValidator validator)
             throws InterruptedException {
@@ -112,12 +95,22 @@ public class EpicenterSeedingService {
         log.info("ShopEntry generation+insertion took {} ms", System.currentTimeMillis() - startMillis);
     }
 
-    private void verifyItemTypeExists() {
+    /**
+     * Runs before the 3M-row pipeline, so an unusable itemType costs seconds instead of minutes.
+     */
+    private void verifyItemTypeIsSearchable() {
         if (!dbRepository.existsItemType(config.itemType())) {
             throw new IllegalArgumentException(String.format(
                     "Unknown itemType '%s'. ItemType names are base categories from item_types.csv "
                             + "with a numeric suffix 1..%d appended - try '%s 1'.",
                     config.itemType(), config.typeIncreaseCoefficient(), config.itemType()));
+        }
+        if (!dbRepository.existsItemTypeWithItems(config.itemType())) {
+            throw new IllegalArgumentException(String.format(
+                    "itemType '%s' exists but holds no items, so no shop can stock it. The item "
+                            + "catalogue is smaller than the type list - lower typeIncreaseCoefficient "
+                            + "or raise shopEntryTarget.",
+                    config.itemType()));
         }
     }
 
@@ -125,11 +118,11 @@ public class EpicenterSeedingService {
         long startMillis = System.currentTimeMillis();
         String topShop = dbRepository.findShopWithMaxItems(config.itemType());
         long searchMillis = System.currentTimeMillis() - startMillis;
-        // Expected as an unreachable case because of the previous "fail fast" check
+        // todo Expected as an unreachable case because of the previous "fail fast" check
         if (topShop == null) {
             log.warn(
                     "No shop found for itemType '{}' ({}) after {} ms, even though the type exists. "
-                            + "Check the ShopEntryGenerator/DataPopulator invariants.",
+                            + "Check the ShopEntryGenerator/FoundationTablesPopulator invariants.",
                     config.itemType(), phase, searchMillis);
             return;
         }

@@ -11,16 +11,9 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 
 /**
- * I/O-bound: validates and inserts batches until it receives the poison pill sentinel.
- * <p>
- * Shop-agnostic, unlike the single-shop ShopEntryProducerSubtask: one instance per consumer
- * thread rather than per shop, and each takes whatever batch reaches the head of the queue,
- * from any shop. That asymmetry is why the consumer pool size is a free tuning knob - more
- * consumers need no change to the data layout - while producers are capped by shopCount.
- * <p>
- * Returns its own inserted-row count, so the pipeline sums the Futures instead of every
- * consumer hammering one shared counter. Being a Callable also lets call() declare throws
- * InterruptedException, so an interrupt ends this consumer at queue.take() by itself.
+ * Validates and inserts ShopEntry batches from queue receives the poison pill in each thread of its class instance.
+ * Unlike the single-shop ShopEntryProducerSubtask: one instance per consumer
+ * thread, not per shop.
  */
 public class ShopEntryConsumer implements Callable<Integer> {
     private static final Logger log = LoggerFactory.getLogger(ShopEntryConsumer.class);
@@ -56,10 +49,6 @@ public class ShopEntryConsumer implements Callable<Integer> {
                 log.warn("Consumer {}: {} of {} entries in batch failed validation and were dropped",
                         consumerName, batch.size() - validBatch.size(), batch.size());
             }
-            /*
-             * A single failed batch must not kill this consumer thread, or it never picks
-             * up its poison pill and starves another still-alive consumer of the real work.
-             */
             try {
                 insertedRows += dbRepository.batchInsertShopEntries(validBatch);
                 consumedBatches++;

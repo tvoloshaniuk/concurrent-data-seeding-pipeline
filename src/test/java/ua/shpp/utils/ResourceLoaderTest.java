@@ -23,8 +23,6 @@ class ResourceLoaderTest {
         }
     }
 
-    /* Failing loudly here is deliberate: a missing resource means the jar was packaged wrong,
-    and a null stream would surface much later as an unrelated NullPointerException. */
     @Test
     void stream_throwsNamingTheResourceThatIsMissing() {
         ResourceLoadException thrown = assertThrows(ResourceLoadException.class, () -> ResourceLoader.stream(MISSING));

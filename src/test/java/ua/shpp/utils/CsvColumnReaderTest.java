@@ -10,10 +10,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/* Not tests of commons-csv but of the four choices made when configuring it - setHeader,
-setSkipHeaderRecord, setTrim and get(0). Flip any of them and the library still works perfectly
-while this class starts returning the header row, the wrong column, or padded values. That is
-what these pin down. */
+// Tests the commons-csv configuration - setHeader, setSkipHeaderRecord, setTrim, get(0) - not the library.
 class CsvColumnReaderTest {
 
     @Test
@@ -37,8 +34,6 @@ class CsvColumnReaderTest {
         assertEquals(List.of("Плитка"), values);
     }
 
-    /* Quoting is what lets an address hold a comma without splitting into two columns -
-    handled by CSVFormat, which is the reason this class exists instead of String.split(","). */
     @Test
     void readFirstColumn_keepsCommasInsideQuotedValues() {
         List<String> values = CsvColumnReader.readFirstColumn(csv("address\n\"Київ, вул. Берковецька 6К\""));

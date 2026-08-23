@@ -26,8 +26,6 @@ class ShopEntryGeneratorTest {
         assertEquals(ITEM_CATALOG_SIZE, entries.size());
     }
 
-    /* The whole row-count guarantee rests on this: every itemId appears once and only once,
-    which is what makes duplicate (item_id, shop_id) pairs impossible without a DB check. */
     @Test
     void generateForShop_coversEveryItemIdExactlyOnce() {
         List<ShopEntryDto> entries = generator().generateForShop(1, SHOP_COUNT, ITEM_CATALOG_SIZE);
@@ -45,11 +43,6 @@ class ShopEntryGeneratorTest {
         assertTrue(entries.stream().allMatch(entry -> entry.shopId() == shopId));
     }
 
-    /* 0 is a legitimate value (listed, out of stock), so the lower bound is inclusive too.
-    Summarised into plain ints first: comparing entry.itemCount() inline makes the IDE trust
-    @Min(0) as a guarantee and call the lower bound redundant, when in fact nothing enforces the
-    annotation at construction - this same generator emits -1 on purpose once the invalid rate is
-    on. Reading through getMin/getMax keeps both bounds genuinely checked. */
     @Test
     void generateForShop_keepsItemCountWithinConfiguredBounds() {
         List<ShopEntryDto> entries = generator().generateForShop(1, SHOP_COUNT, ITEM_CATALOG_SIZE);
@@ -66,8 +59,6 @@ class ShopEntryGeneratorTest {
         assertEquals(ITEM_CATALOG_SIZE, generator().generateForShop(SHOP_COUNT, SHOP_COUNT, ITEM_CATALOG_SIZE).size());
     }
 
-    /* shopId's upper bound cannot be a @Max on ShopEntryDto because it depends on the row
-    count of shops.csv, so this guard is the only thing enforcing it. */
     @ParameterizedTest
     @ValueSource(ints = {0, -1, SHOP_COUNT + 1})
     void generateForShop_rejectsShopIdOutsideRange(int shopId) {
@@ -84,9 +75,6 @@ class ShopEntryGeneratorTest {
         assertTrue(entries.stream().allMatch(VALIDATOR::isValid));
     }
 
-    /* At 100% every itemId gets one invalid row ALONGSIDE its valid one, never instead of it -
-    that is what keeps the valid count at exactly itemCatalogSize whatever the rate is, so
-    plannedRows and the row target stay untouched. */
     @Test
     void generateForShop_addsInvalidEntriesWithoutLosingAnyValidOne() {
         ShopEntryGenerator generator = new ShopEntryGenerator(MAX_STOCK_QUANTITY, 100);
@@ -97,7 +85,6 @@ class ShopEntryGeneratorTest {
         assertEquals(ITEM_CATALOG_SIZE, entries.stream().filter(VALIDATOR::isValid).count());
     }
 
-    // Every itemId must still appear among the valid rows, otherwise a ShopEntry row would be lost.
     @Test
     void generateForShop_stillCoversEveryItemIdWhenInvalidGenerationIsOn() {
         ShopEntryGenerator generator = new ShopEntryGenerator(MAX_STOCK_QUANTITY, 100);

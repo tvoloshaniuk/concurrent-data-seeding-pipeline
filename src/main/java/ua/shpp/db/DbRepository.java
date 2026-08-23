@@ -24,7 +24,7 @@ public class DbRepository {
         this.dataSource = dataSource;
     }
 
-    /**
+    /** todo
      * Suppression: sql is always the content of a trusted, static classpath resource
      * (schema.sql, post_load_indexes.sql), never external/user input; DDL statements also
      * don't support PreparedStatement parameters.
@@ -75,10 +75,6 @@ public class DbRepository {
     }
 
     public void batchInsertItems(List<ItemDto> items) {
-        /*
-         * ON CONFLICT DO NOTHING is a defensive safety net for Item(name) UNIQUE - names are
-         * UUIDs, so a real collision is astronomically unlikely, not the normal path.
-         */
         String sql = "INSERT INTO Item(name, type_id) VALUES (?, ?) ON CONFLICT DO NOTHING";
         try (
                 Connection connection = dataSource.getConnection();
@@ -96,7 +92,7 @@ public class DbRepository {
     }
 
     public int batchInsertShopEntries(List<ShopEntryDto> entries) {
-        /*
+        /* todo
           (item_id, shop_id) names the exact UNIQUE constraint from schema.sql - if that
           constraint is ever renamed, Postgres fails loudly here instead of silently
           targeting the wrong index.
@@ -121,9 +117,6 @@ public class DbRepository {
 
     /**
      * Counts rows actually inserted (excludes duplicates ON CONFLICT skipped).
-     * SUCCESS_NO_INFO shows up when the driver batches multiple rows into one rewritten
-     * INSERT (Postgres reWriteBatchedInserts) and can't report an exact per-row count -
-     * it still means that row was successfully inserted, just without the precise count.
      */
     int countInserted(int[] results) {
         int inserted = 0;
@@ -135,10 +128,7 @@ public class DbRepository {
         return inserted;
     }
 
-    /**
-     * LIMIT 1 rather than COUNT(*): the question is only whether a previous run left data behind,
-     * and on 3M rows an exact count would cost a full scan to answer something a single row settles.
-     */
+    // Check if ShopEntry table contains any data
     public boolean hasShopEntries() {
         String sql = "SELECT 1 FROM ShopEntry LIMIT 1";
         try (
@@ -167,17 +157,46 @@ public class DbRepository {
         }
     }
 
+    /**
+     * Separate from existsItemType because the two failures need different advice: an unknown name is
+     * a typo, while a known name with no items means the type list outgrew the item catalogue and the
+     * last types were left empty.
+     */
+    public boolean existsItemTypeWithItems(String name) {
+        String sql = """
+                SELECT 1
+                FROM ItemType it
+                JOIN Item i ON i.type_id = it.id
+                WHERE it.name = ?
+                LIMIT 1
+                """;
+        try (
+                Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql)
+        ) {
+            statement.setString(1, name);
+            try (ResultSet rs = statement.executeQuery()) {
+                return rs.next();
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public String findShopWithMaxItems(String itemType) {
         String sql = """
                 SELECT s.address
-                FROM ShopEntry se
-                JOIN Item i ON i.id = se.item_id
-                JOIN ItemType it ON it.id = i.type_id
-                JOIN Shop s ON s.id = se.shop_id
-                WHERE it.name = ?
-                GROUP BY s.address
-                ORDER BY SUM(se.item_count) DESC
-                LIMIT 1
+                FROM (
+                    SELECT se.shop_id, SUM(se.item_count) AS total
+                    FROM ShopEntry se
+                    JOIN Item i ON i.id = se.item_id
+                    JOIN ItemType it ON it.id = i.type_id
+                    WHERE it.name = ?
+                    GROUP BY se.shop_id
+                    ORDER BY total DESC
+                    LIMIT 1
+                ) top
+                JOIN Shop s ON s.id = top.shop_id
                 """;
         try (
                 Connection connection = dataSource.getConnection();

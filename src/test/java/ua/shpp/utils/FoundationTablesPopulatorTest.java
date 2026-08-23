@@ -20,10 +20,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
-/* ByteArrayInputStream holds no OS handle and its close() is a no-op, so the IDE's
-try-with-resources hint buys nothing here and would only bury the tests in nesting. */
+// ByteArrayInputStream holds no OS handle and its close() is a no-op.
 @SuppressWarnings("resource")
-class DataPopulatorTest {
+class FoundationTablesPopulatorTest {
     private static final String THREE_SHOPS = "address\nКиїв 1\nЛьвів 2\nОдеса 3";
     private static final String TWO_TYPES = "name\nПлитка\nПосуд";
 
@@ -32,11 +31,11 @@ class DataPopulatorTest {
     private final DtoValidator validator = new DtoValidator();
 
     @Test
-    void fillFoundationTables_reportsShopCountAndDerivedCatalogSize() {
-        DataPopulator populator = new DataPopulator(dbRepository, config(30, 2), validator);
+    void populate_reportsShopCountAndDerivedCatalogSize() {
+        FoundationTablesPopulator populator = new FoundationTablesPopulator(dbRepository, config(30, 2), validator);
 
         CatalogDimensions dimensions =
-                populator.fillFoundationTables(csv(THREE_SHOPS), csv(TWO_TYPES));
+                populator.populate(csv(THREE_SHOPS), csv(TWO_TYPES));
 
         assertEquals(3, dimensions.shopCount());
         // ceilDiv(30, 3) - rounded up so the pipeline never plans fewer rows than the target
@@ -44,20 +43,20 @@ class DataPopulatorTest {
     }
 
     @Test
-    void fillFoundationTables_roundsCatalogSizeUpWhenTargetIsNotDivisible() {
-        DataPopulator populator = new DataPopulator(dbRepository, config(31, 2), validator);
+    void populate_roundsCatalogSizeUpWhenTargetIsNotDivisible() {
+        FoundationTablesPopulator populator = new FoundationTablesPopulator(dbRepository, config(31, 2), validator);
 
         CatalogDimensions dimensions =
-                populator.fillFoundationTables(csv(THREE_SHOPS), csv(TWO_TYPES));
+                populator.populate(csv(THREE_SHOPS), csv(TWO_TYPES));
 
         assertEquals(11, dimensions.itemCatalogSize());
     }
 
     @Test
-    void fillFoundationTables_insertsEveryShopFromCsv() {
-        DataPopulator populator = new DataPopulator(dbRepository, config(30, 2), validator);
+    void populate_insertsEveryShopFromCsv() {
+        FoundationTablesPopulator populator = new FoundationTablesPopulator(dbRepository, config(30, 2), validator);
 
-        populator.fillFoundationTables(csv(THREE_SHOPS), csv(TWO_TYPES));
+        populator.populate(csv(THREE_SHOPS), csv(TWO_TYPES));
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<ShopDto>> captor = ArgumentCaptor.forClass(List.class);
@@ -66,13 +65,11 @@ class DataPopulatorTest {
                 captor.getValue());
     }
 
-    /* Every base category is multiplied by typeIncreaseCoefficient with a numeric suffix -
-    the reason a plain "Плитка" never matches anything in the final search. */
     @Test
-    void fillFoundationTables_expandsEachBaseCategoryWithNumericSuffix() {
-        DataPopulator populator = new DataPopulator(dbRepository, config(30, 3), validator);
+    void populate_expandsEachBaseCategoryWithNumericSuffix() {
+        FoundationTablesPopulator populator = new FoundationTablesPopulator(dbRepository, config(30, 3), validator);
 
-        populator.fillFoundationTables(csv(THREE_SHOPS), csv(TWO_TYPES));
+        populator.populate(csv(THREE_SHOPS), csv(TWO_TYPES));
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<ItemTypeDto>> captor = ArgumentCaptor.forClass(List.class);
@@ -83,13 +80,11 @@ class DataPopulatorTest {
         ), captor.getValue());
     }
 
-    /* The first itemTypeCount items take types in order so no type is left without an item,
-    which is what makes the final search guaranteed to find something for any valid type. */
     @Test
-    void fillFoundationTables_givesEveryTypeAtLeastOneItem() {
-        DataPopulator populator = new DataPopulator(dbRepository, config(30, 3), validator);
+    void populate_givesEveryTypeAtLeastOneItem() {
+        FoundationTablesPopulator populator = new FoundationTablesPopulator(dbRepository, config(30, 3), validator);
 
-        populator.fillFoundationTables(csv(THREE_SHOPS), csv(TWO_TYPES));
+        populator.populate(csv(THREE_SHOPS), csv(TWO_TYPES));
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<ItemDto>> captor = ArgumentCaptor.forClass(List.class);
@@ -104,45 +99,40 @@ class DataPopulatorTest {
     }
 
     @Test
-    void fillFoundationTables_throwsWhenShopsCsvHasNoRows() {
-        DataPopulator populator = new DataPopulator(dbRepository, config(30, 2), validator);
+    void populate_throwsWhenShopsCsvHasNoRows() {
+        FoundationTablesPopulator populator = new FoundationTablesPopulator(dbRepository, config(30, 2), validator);
         InputStream emptyShops = csv("address\n");
         InputStream types = csv(TWO_TYPES);
 
-        assertThrows(IllegalStateException.class, () -> populator.fillFoundationTables(emptyShops, types));
+        assertThrows(IllegalStateException.class, () -> populator.populate(emptyShops, types));
     }
 
     @Test
-    void fillFoundationTables_throwsWhenItemTypesCsvHasNoRows() {
-        DataPopulator populator = new DataPopulator(dbRepository, config(30, 2), validator);
+    void populate_throwsWhenItemTypesCsvHasNoRows() {
+        FoundationTablesPopulator populator = new FoundationTablesPopulator(dbRepository, config(30, 2), validator);
         InputStream shops = csv(THREE_SHOPS);
         InputStream emptyTypes = csv("name\n");
 
-        assertThrows(IllegalStateException.class, () -> populator.fillFoundationTables(shops, emptyTypes));
+        assertThrows(IllegalStateException.class, () -> populator.populate(shops, emptyTypes));
     }
 
-    /* A single shop is a legitimate setup, not a broken file: itemCatalogSize is derived from
-    shopCount, so it simply grows to 30 and the row target still holds. */
     @Test
-    void fillFoundationTables_acceptsASingleShop() {
-        DataPopulator populator = new DataPopulator(dbRepository, config(30, 2), validator);
+    void populate_acceptsASingleShop() {
+        FoundationTablesPopulator populator = new FoundationTablesPopulator(dbRepository, config(30, 2), validator);
 
         CatalogDimensions dimensions =
-                populator.fillFoundationTables(csv("address\nКиїв 1"), csv(TWO_TYPES));
+                populator.populate(csv("address\nКиїв 1"), csv(TWO_TYPES));
 
         assertEquals(1, dimensions.shopCount());
         assertEquals(30, dimensions.itemCatalogSize());
     }
 
-    /* The whole reason generation retries instead of filtering: invalid generation must not shrink the
-    catalogue. Fewer items than itemCatalogSize would leave ShopEntryGenerator enumerating item
-    ids the database never assigned, and every such row would break the foreign key. */
     @Test
-    void fillFoundationTables_stillDeliversTheFullCatalogueWhenInvalidGenerationIsOn() {
-        DataPopulator populator = new DataPopulator(dbRepository, config(30, 2, 50), validator);
+    void populate_stillDeliversTheFullCatalogueWhenInvalidGenerationIsOn() {
+        FoundationTablesPopulator populator = new FoundationTablesPopulator(dbRepository, config(30, 2, 50), validator);
 
         CatalogDimensions dimensions =
-                populator.fillFoundationTables(csv(THREE_SHOPS), csv(TWO_TYPES));
+                populator.populate(csv(THREE_SHOPS), csv(TWO_TYPES));
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<ItemDto>> captor = ArgumentCaptor.forClass(List.class);
@@ -151,25 +141,33 @@ class DataPopulatorTest {
         assertTrue(captor.getValue().stream().allMatch(validator::isValid));
     }
 
-    // A 100% invalid rate can never fill the catalogue, so it fails with a bounded number of tries.
     @Test
-    void fillFoundationTables_throwsWhenEveryCandidateIsInvalid() {
-        DataPopulator populator = new DataPopulator(dbRepository, config(30, 2, 100), validator);
-        InputStream shops = csv(THREE_SHOPS);
-        InputStream types = csv(TWO_TYPES);
-
-        assertThrows(IllegalStateException.class, () -> populator.fillFoundationTables(shops, types));
+    void appConfig_rejectsAnInvalidRateOf100() {
+        assertThrows(IllegalArgumentException.class, () -> config(30, 2, 100));
     }
 
-    /* Too many types for too small a catalog would leave types with no items at all, so this
-    fails loudly instead of producing a data set where some searches silently find nothing. */
+    // 99 is the highest rate the loop must still cope with, and it must return a full catalogue.
     @Test
-    void fillFoundationTables_throwsWhenCatalogTooSmallToCoverEveryType() {
-        DataPopulator populator = new DataPopulator(dbRepository, config(6, 5), validator);
-        InputStream shops = csv(THREE_SHOPS);
-        InputStream types = csv(TWO_TYPES);
+    void populate_stillFillsTheCatalogueAtTheHighestAllowedInvalidRate() {
+        FoundationTablesPopulator populator = new FoundationTablesPopulator(dbRepository, config(30, 2, 99), validator);
 
-        assertThrows(IllegalStateException.class, () -> populator.fillFoundationTables(shops, types));
+        CatalogDimensions dimensions = populator.populate(csv(THREE_SHOPS), csv(TWO_TYPES));
+
+        assertEquals(10, dimensions.itemCatalogSize());
+    }
+
+    @Test
+    void populate_stillFillsTheCatalogueWhenThereAreMoreTypesThanItems() {
+        FoundationTablesPopulator populator = new FoundationTablesPopulator(dbRepository, config(6, 5), validator);
+
+        CatalogDimensions dimensions = populator.populate(csv(THREE_SHOPS), csv(TWO_TYPES));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<ItemDto>> captor = ArgumentCaptor.forClass(List.class);
+        verify(dbRepository).batchInsertItems(captor.capture());
+        assertEquals(2, dimensions.itemCatalogSize());
+        assertEquals(2, captor.getValue().size());
+        assertTrue(captor.getValue().stream().allMatch(item -> item.typeId() >= 1 && item.typeId() <= 10));
     }
 
     private static AppConfig config(int shopEntryTarget, int typeIncreaseCoefficient) {

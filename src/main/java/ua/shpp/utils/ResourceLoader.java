@@ -8,12 +8,6 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Properties;
 
-/**
- * All-static on purpose, and this is the harmless kind: the class holds no fields, so nothing
- * survives a call and nothing outlives the JVM beyond the class itself. What "static is evil"
- * warns about is static *state* - the ValidatorFactory this project used to keep in a static
- * field, which one application could close out from under another sharing the JVM.
- */
 public final class ResourceLoader {
     private ResourceLoader() {
     }
@@ -28,6 +22,7 @@ public final class ResourceLoader {
         return inputStream;
     }
 
+    //todo
     public static String readText(String fileName) {
         try (InputStream inputStream = stream(fileName)) {
             return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
@@ -36,11 +31,6 @@ public final class ResourceLoader {
         }
     }
 
-    /**
-     * Still classpath-based - the Reader wraps the very same stream(fileName) above. It exists
-     * for the charset: Properties.load(InputStream) decodes as ISO-8859-1 by legacy contract,
-     * which mangles UTF-8, while Properties.load(Reader) honours the reader's charset.
-     */
     public static Properties readProperties(String fileName) {
         try (InputStreamReader reader = new InputStreamReader(stream(fileName), StandardCharsets.UTF_8)) {
             Properties properties = new Properties();

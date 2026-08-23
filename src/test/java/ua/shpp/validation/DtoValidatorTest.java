@@ -20,8 +20,7 @@ class DtoValidatorTest {
         assertTrue(validator.isValid(new ShopEntryDto(1, 1, 0)));
     }
 
-    /* itemCount 0 is valid on purpose (listed but out of stock), while ids must be positive -
-    that asymmetry is the whole point of @Min(0) vs @Positive here. */
+    // itemCount 0 is valid (listed but out of stock), ids are not - @Min(0) vs @Positive.
     @ParameterizedTest
     @CsvSource({
             "0, 1, 5",
@@ -50,6 +49,11 @@ class DtoValidatorTest {
     }
 
     @Test
+    void isValid_rejectsShopAddressWithoutLeadingCapital() {
+        assertFalse(validator.isValid(new ShopDto("invalidАдреса з малої літери")));
+    }
+
+    @Test
     void isValid_acceptsWellFormedItemType() {
         assertTrue(validator.isValid(new ItemTypeDto("Сантехніка 1")));
     }
@@ -59,8 +63,6 @@ class DtoValidatorTest {
         assertFalse(validator.isValid(new ItemTypeDto("")));
     }
 
-    /* A lowercase category in item_types.csv is a typo, not a style choice - every real entry
-    there is a proper noun. */
     @Test
     void isValid_rejectsItemTypeNameWithoutLeadingCapital() {
         assertFalse(validator.isValid(new ItemTypeDto("сантехніка 1")));
@@ -71,8 +73,6 @@ class DtoValidatorTest {
         assertTrue(validator.isValid(new ItemDto("Товар-42", 1)));
     }
 
-    /* Each of these mirrors one invalid-generation mode in ItemGenerator, so together they prove every
-    mode it can produce is genuinely rejected rather than slipping through. */
     @Test
     void isValid_rejectsBlankItemName() {
         assertFalse(validator.isValid(new ItemDto("", 1)));
@@ -93,8 +93,6 @@ class DtoValidatorTest {
         assertFalse(validator.isValid(new ItemDto(" Товар-42", 1)));
     }
 
-    /* Suppressed rather than obeyed: the IDE reads @Positive as a constructor contract, but the
-    annotation only declares - building a violating record is the very thing under test here. */
     @SuppressWarnings("DataFlowIssue")
     @Test
     void isValid_rejectsNonPositiveItemTypeId() {

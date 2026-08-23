@@ -23,8 +23,6 @@ import static org.mockito.Mockito.when;
 class EpicenterSeedingServiceTest {
     private final DbRepository dbRepository = mock(DbRepository.class);
 
-    /* The whole point of the guard: a mistyped argument must cost seconds, not a full run.
-    Never touching ShopEntry is what proves it aborted before the expensive part. */
     @Test
     void execute_failsBeforeGeneratingShopEntriesWhenItemTypeIsUnknown() {
         when(dbRepository.existsItemType(anyString())).thenReturn(false);
@@ -36,8 +34,6 @@ class EpicenterSeedingServiceTest {
         verify(dbRepository, never()).batchInsertShopEntries(anyList());
     }
 
-    /* The exact mistake this catches is passing a bare category instead of the suffixed name,
-    so the message has to say that - otherwise the guard just replaces one puzzle with another. */
     @Test
     void execute_explainsTheSuffixConventionWhenItemTypeIsUnknown() {
         when(dbRepository.existsItemType(anyString())).thenReturn(false);
@@ -52,8 +48,23 @@ class EpicenterSeedingServiceTest {
     }
 
     @Test
+    void execute_failsBeforeGeneratingShopEntriesWhenItemTypeHoldsNoItems() {
+        when(dbRepository.existsItemType(anyString())).thenReturn(true);
+        when(dbRepository.existsItemTypeWithItems(anyString())).thenReturn(false);
+
+        EpicenterSeedingService service = service();
+
+        IllegalArgumentException thrown =
+                assertThrows(IllegalArgumentException.class, service::execute);
+
+        assertTrue(thrown.getMessage().contains("typeIncreaseCoefficient"), thrown.getMessage());
+        verify(dbRepository, never()).batchInsertShopEntries(anyList());
+    }
+
+    @Test
     void execute_completesWhenItemTypeExistsAndEveryRowLands() {
         when(dbRepository.existsItemType(anyString())).thenReturn(true);
+        when(dbRepository.existsItemTypeWithItems(anyString())).thenReturn(true);
         when(dbRepository.batchInsertShopEntries(anyList()))
                 .thenAnswer(invocation -> ((List<?>) invocation.getArgument(0)).size());
         when(dbRepository.findShopWithMaxItems(anyString())).thenReturn("Київ, вул. Берковецька 6К");
@@ -63,11 +74,10 @@ class EpicenterSeedingServiceTest {
         assertDoesNotThrow(service::execute);
     }
 
-    /* A missing top shop is reported, not thrown: the run still produced valid timings, and
-    losing them would hurt more than failing helps at that point. */
     @Test
     void execute_toleratesNoMatchingShopWithoutFailingTheRun() {
         when(dbRepository.existsItemType(anyString())).thenReturn(true);
+        when(dbRepository.existsItemTypeWithItems(anyString())).thenReturn(true);
         when(dbRepository.batchInsertShopEntries(anyList()))
                 .thenAnswer(invocation -> ((List<?>) invocation.getArgument(0)).size());
         when(dbRepository.findShopWithMaxItems(anyString())).thenReturn(null);
@@ -77,11 +87,10 @@ class EpicenterSeedingServiceTest {
         assertDoesNotThrow(service::execute);
     }
 
-    /* Index creation must come after the bulk load, otherwise every inserted row pays for an
-    incremental B-tree update - the ordering is a performance decision, not a formality. */
     @Test
     void execute_buildsSecondaryIndexesOnlyAfterShopEntryIsFilled() throws Exception {
         when(dbRepository.existsItemType(anyString())).thenReturn(true);
+        when(dbRepository.existsItemTypeWithItems(anyString())).thenReturn(true);
         when(dbRepository.batchInsertShopEntries(anyList()))
                 .thenAnswer(invocation -> ((List<?>) invocation.getArgument(0)).size());
 
@@ -92,12 +101,11 @@ class EpicenterSeedingServiceTest {
         inOrder.verify(dbRepository).runDdl(contains("CREATE INDEX"));
     }
 
-    /* The point of the flag: a repeated run against a database that already holds 3M rows must
-    not spend minutes regenerating identical data before answering the same question. */
     @Test
     void execute_skipsGenerationWhenSchemaIsKeptAndDataAlreadyExists() throws Exception {
         when(dbRepository.hasShopEntries()).thenReturn(true);
         when(dbRepository.existsItemType(anyString())).thenReturn(true);
+        when(dbRepository.existsItemTypeWithItems(anyString())).thenReturn(true);
 
         new EpicenterSeedingService(config(false), dbRepository).execute();
 
@@ -111,6 +119,7 @@ class EpicenterSeedingServiceTest {
     void execute_populatesWhenSchemaIsKeptButTableIsEmpty() throws Exception {
         when(dbRepository.hasShopEntries()).thenReturn(false);
         when(dbRepository.existsItemType(anyString())).thenReturn(true);
+        when(dbRepository.existsItemTypeWithItems(anyString())).thenReturn(true);
         when(dbRepository.batchInsertShopEntries(anyList()))
                 .thenAnswer(invocation -> ((List<?>) invocation.getArgument(0)).size());
 
@@ -123,6 +132,7 @@ class EpicenterSeedingServiceTest {
     @Test
     void execute_rebuildsWithoutEvenAskingWhenSchemaIsRecreated() throws Exception {
         when(dbRepository.existsItemType(anyString())).thenReturn(true);
+        when(dbRepository.existsItemTypeWithItems(anyString())).thenReturn(true);
         when(dbRepository.batchInsertShopEntries(anyList()))
                 .thenAnswer(invocation -> ((List<?>) invocation.getArgument(0)).size());
 
@@ -136,8 +146,7 @@ class EpicenterSeedingServiceTest {
         return new EpicenterSeedingService(config(), dbRepository);
     }
 
-    /* shopEntryTarget 3000 over the real 57-shop shops.csv gives a 53-item catalog, which must
-    still cover the 40 expanded types (20 categories x coefficient 2) that DataPopulator builds. */
+    // shopEntryTarget 3000 over 57 shops gives a 53-item catalog, enough for the 40 expanded types.
     private static AppConfig config() {
         return config(true);
     }

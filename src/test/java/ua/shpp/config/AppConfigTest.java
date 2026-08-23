@@ -55,11 +55,6 @@ class AppConfigTest {
         assertThrows(IllegalArgumentException.class, () -> configWithInvalidRate(-1));
     }
 
-    /* The counterpart to the three above: they prove the validation rejects bad input, this one
-    proves it is not so strict that it rejects good input. Asserting the getters instead would
-    only be testing that a record returns what it was given. */
-    /* Kept last on purpose: the rejection tests above define what "invalid" means, so this one
-    reads as the closing statement that nothing valid got caught in that net. */
     @Test
     void constructor_acceptsFullyPopulatedConfig() {
         assertDoesNotThrow(() -> configWith(VALID_URL, 500, 500));

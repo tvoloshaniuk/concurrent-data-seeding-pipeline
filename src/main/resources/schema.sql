@@ -27,5 +27,5 @@ CREATE TABLE ShopEntry (
     item_count INTEGER NOT NULL,
     CONSTRAINT fk_shop_entry_item FOREIGN KEY (item_id) REFERENCES Item(id) ON DELETE CASCADE,
     CONSTRAINT fk_shop_entry_shop FOREIGN KEY (shop_id) REFERENCES Shop(id) ON DELETE CASCADE,
-    CONSTRAINT uq_shop_entry_item_shop UNIQUE (item_id, shop_id)
+    CONSTRAINT uq_shop_entry_item_shop UNIQUE (item_id, shop_id) -- todo можливо перенести в post_load_indexes.sql
 );

@@ -34,8 +34,7 @@ class ShopEntryProducerSubtaskTest {
         assertEquals(10, drain().size());
     }
 
-    /* 10 rows at batchSize 4 must come out as 4+4+2, not 4+4+4 - the Math.min guard on the
-    last slice is the only thing stopping subList from running past the end. */
+    // 10 rows at batchSize 4 must come out as 4+4+2, not 4+4+4.
     @Test
     void call_makesTheLastBatchShorterWhenSizeIsNotDivisible() throws Exception {
         subtask(1, 10, 4).call();
@@ -50,8 +49,6 @@ class ShopEntryProducerSubtaskTest {
         subtask(1, 3, 500).call();
 
         assertEquals(1, queue.size());
-        // element() rather than peek(): it throws on an empty queue instead of returning null,
-        // so a regression shows up as a failed test rather than an NPE with no context.
         assertEquals(3, queue.element().size());
     }
 
