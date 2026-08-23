@@ -1,14 +1,17 @@
 db.url=jdbc:postgresql://localhost:5432/epicenter
 db.user=postgres
-db.password=123
+db.password=your_password_here
+
 queue.capacity=5000
 producer.thread.pool.size=2
 consumer.thread.pool.size=4
 batch.size=500
+
+# total ShopEntry rows to generate and load
 shop.entry.target=3000000
-# AmountOfItemTypes = amount of rows in "types.csv" multiplied by this coefficient
+# itemCatalogSize = rows in item_types.csv * this coefficient
 type.increase.coefficient=1000
 max.stock.quantity=500
-# invalid chance in generated data: ItemNamesDto, ShopEntryDto
+# share of deliberately invalid generated rows, range [0, 99]
 invalid.rate.percent=0
 recreate.schema=true

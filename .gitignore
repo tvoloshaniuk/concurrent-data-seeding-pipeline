@@ -37,3 +37,8 @@ build/
 
 ### Mac OS ###
 .DS_Store
+### Local
+logs/
+*.log
+hs_err_pid*.log
+src/main/resources/config.properties
