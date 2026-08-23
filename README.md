@@ -66,5 +66,5 @@ Requires PostgreSQL 12+ and JDK 17+.
 
 ## Stack
 
-Java · PostgreSQL · JDBC · Hibernate Validator · Datafaker · Apache Commons CSV ·
-Logback · JUnit 5 · Mockito · Maven
+Java, PostgreSQL, JDBC, Hibernate Validator, Datafaker, Apache Commons CSV,
+Logback, JUnit 5, Mockito, Maven
