@@ -43,27 +43,6 @@ number of rows.
 Four tables — `ItemType`, `Shop`, `Item`, `ShopEntry` — normalised to 3NF, with
 foreign keys cascading on delete and a uniqueness constraint on the
 (item, shop) pair. Full DDL in [`schema.sql`](src/main/resources/schema.sql).
-
-## Tests
-
-12 test classes covering the pipeline, repository, generators, CSV reading,
-configuration and validation. JUnit 5 with Mockito for the database boundary.
-
-```bash
-mvn test
-```
-
-## Running it
-
-```bash
-cp src/main/resources/config.properties.example src/main/resources/config.properties
-# edit db.url / db.user / db.password
-mvn clean package
-java -jar target/pract4-0.0.1.jar
-```
-
-Requires PostgreSQL 12+ and JDK 17+.
-
 ## Stack
 
 Java, PostgreSQL, JDBC, Hibernate Validator, Datafaker, Apache Commons CSV,
