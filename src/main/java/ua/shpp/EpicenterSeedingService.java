@@ -57,6 +57,7 @@ public class EpicenterSeedingService {
         return true;
     }
 
+    //fill tables & create indexes
     private void seed(DtoValidator validator) throws InterruptedException {
         dbRepository.runDdl(ResourceLoader.readText("schema.sql"));
 
