@@ -41,7 +41,7 @@ build/
 logs/
 *.log
 hs_err_pid*.log
-src/main/resources/config.properties
+config.properties
 
 ### IDE / tooling
 .idea/
