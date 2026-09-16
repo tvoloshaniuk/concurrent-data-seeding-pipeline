@@ -59,75 +59,31 @@ public class EpicenterSeedingService {
 
     //fill tables & create indexes
     private void seed(DtoValidator validator) throws InterruptedException {
-        dbRepository.runDdl(ResourceLoader.readText("schema.sql"));
 
-        CatalogDimensions dimensions = fillFoundationTables(validator);
-        verifyItemTypeIsSearchable();
-        fillShopEntryTable(dimensions, validator);
-
-        findAndLogTopShop("before indexes");
-
-        // Create indexes after data population, not before -- to improve performance
-        dbRepository.runDdl(ResourceLoader.readText("post_load_indexes.sql"));
     }
 
     // Fills Shop, ItemType and Item - the three small/sequential tables ShopEntry depends on.
     private CatalogDimensions fillFoundationTables(DtoValidator validator) {
-        try (
-                InputStream shopAddresses = ResourceLoader.stream("shops.csv");
-                InputStream itemTypes = ResourceLoader.stream("item_types.csv")
-        ) {
-            FoundationTablesPopulator populator = new FoundationTablesPopulator(dbRepository, config, validator);
-            return populator.populate(shopAddresses, itemTypes);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        '
     }
 
     /**
      * Fills the final, largest table (ShopEntry, 3M+ rows) via the parallel pipeline.
      * Producer (generation) vs consumer (insertion).
      */
-    private void fillShopEntryTable(CatalogDimensions dimensions, DtoValidator validator)
-            throws InterruptedException {
-        long startMillis = System.currentTimeMillis();
-        new ProducerConsumerPipeline()
-                .execute(dbRepository, validator, config, dimensions);
-        log.info("ShopEntry generation+insertion took {} ms", System.currentTimeMillis() - startMillis);
+    private void fillShopEntryTable(CatalogDimensions dimensions, DtoValidator validator) throws InterruptedException {
+
     }
 
     /**
      * Runs before the 3M-row pipeline, so an unusable itemType costs seconds instead of minutes.
      */
     private void verifyItemTypeIsSearchable() {
-        if (!dbRepository.existsItemType(config.itemType())) {
-            throw new IllegalArgumentException(String.format(
-                    "Unknown itemType '%s'. ItemType names are base categories from item_types.csv "
-                            + "with a numeric suffix 1..%d appended - try '%s 1'.",
-                    config.itemType(), config.typeIncreaseCoefficient(), config.itemType()));
-        }
-        if (!dbRepository.existsItemTypeWithItems(config.itemType())) {
-            throw new IllegalArgumentException(String.format(
-                    "itemType '%s' exists but holds no items, so no shop can stock it. The item "
-                            + "catalogue is smaller than the type list - lower typeIncreaseCoefficient "
-                            + "or raise shopEntryTarget.",
-                    config.itemType()));
-        }
+
     }
 
     private void findAndLogTopShop(String phase) {
-        long startMillis = System.currentTimeMillis();
-        String topShop = dbRepository.findShopWithMaxItems(config.itemType());
-        long searchMillis = System.currentTimeMillis() - startMillis;
-        // todo Expected as an unreachable case because of the previous "fail fast" check
-        if (topShop == null) {
-            log.warn(
-                    "No shop found for itemType '{}' ({}) after {} ms, even though the type exists. "
-                            + "Check the ShopEntryGenerator/FoundationTablesPopulator invariants.",
-                    config.itemType(), phase, searchMillis);
-            return;
-        }
-        log.info("Top Shop ({}): {} (found in {} ms)", phase, topShop, searchMillis);
+
     }
 
     private static DataSource initDatasource(AppConfig config) {
