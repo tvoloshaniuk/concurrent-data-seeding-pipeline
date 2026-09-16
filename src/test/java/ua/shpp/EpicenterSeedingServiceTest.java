@@ -142,6 +142,22 @@ class EpicenterSeedingServiceTest {
         verify(dbRepository).runDdl(contains("CREATE TABLE"));
     }
 
+    @Test
+    void execute_dropsSearchesRebuildsAndSearchesAgainWhenIndexesAreRecreated() throws Exception {
+        when(dbRepository.hasShopEntries()).thenReturn(true);
+        when(dbRepository.existsItemType(anyString())).thenReturn(true);
+        when(dbRepository.existsItemTypeWithItems(anyString())).thenReturn(true);
+
+        new EpicenterSeedingService(config(false, true), dbRepository).execute();
+
+        InOrder inOrder = inOrder(dbRepository);
+        inOrder.verify(dbRepository).runDdl(contains("DROP INDEX"));
+        inOrder.verify(dbRepository).findShopWithMaxItems(anyString());
+        inOrder.verify(dbRepository).runDdl(contains("CREATE INDEX"));
+        inOrder.verify(dbRepository).findShopWithMaxItems(anyString());
+        verify(dbRepository, never()).batchInsertShopEntries(anyList());
+    }
+
     private EpicenterSeedingService service() {
         return new EpicenterSeedingService(config(), dbRepository);
     }
@@ -152,7 +168,11 @@ class EpicenterSeedingServiceTest {
     }
 
     private static AppConfig config(boolean recreateSchema) {
+        return config(recreateSchema, false);
+    }
+
+    private static AppConfig config(boolean recreateSchema, boolean recreateIndexes) {
         return new AppConfig("jdbc:unused-by-unit-test", "unused", "unused",
-                100, 2, 2, 500, 3000, 2, 500, 0, recreateSchema, "Сантехніка 1");
+                100, 2, 2, 500, 3000, 2, 500, 0, recreateSchema, recreateIndexes, "Сантехніка 1");
     }
 }

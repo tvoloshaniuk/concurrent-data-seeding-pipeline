@@ -62,11 +62,11 @@ class AppConfigTest {
 
     private static AppConfig configWithInvalidRate(int invalidRatePercent) {
         return new AppConfig(VALID_URL, "postgres", "123", 5000, 2, 4, 500,
-                3_000_000, 1000, 500, invalidRatePercent, true, "Сантехніка 1");
+                3_000_000, 1000, 500, invalidRatePercent, true, false, "Сантехніка 1");
     }
 
     private static AppConfig configWith(String dbUrl, int batchSize, int maxStockQuantity) {
         return new AppConfig(dbUrl, "postgres", "123", 5000, 2, 4, batchSize,
-                3_000_000, 1000, maxStockQuantity, 0, true, "Сантехніка 1");
+                3_000_000, 1000, maxStockQuantity, 0, true, false, "Сантехніка 1");
     }
 }

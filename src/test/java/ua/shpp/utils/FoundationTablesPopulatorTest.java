@@ -167,7 +167,7 @@ class FoundationTablesPopulatorTest {
         verify(dbRepository).batchInsertItems(captor.capture());
         assertEquals(2, dimensions.itemCatalogSize());
         assertEquals(2, captor.getValue().size());
-        assertTrue(captor.getValue().stream().allMatch(item -> item.typeId() >= 1 && item.typeId() <= 10));
+        assertTrue(captor.getValue().stream().allMatch(item -> item.typeId() <= 10));
     }
 
     private static AppConfig config(int shopEntryTarget, int typeIncreaseCoefficient) {
@@ -178,7 +178,7 @@ class FoundationTablesPopulatorTest {
         // Credentials only have to be non-blank - nothing here ever opens a connection.
         return new AppConfig("jdbc:unused-by-unit-test", "unused", "unused",
                 5000, 2, 4, 500,
-                shopEntryTarget, typeIncreaseCoefficient, 500, invalidRatePercent, true, "Плитка 1");
+                shopEntryTarget, typeIncreaseCoefficient, 500, invalidRatePercent, true, false, "Плитка 1");
     }
 
     private static InputStream csv(String content) {

@@ -87,6 +87,6 @@ class ProducerConsumerPipelineTest {
     private static AppConfig config(int shopEntryTarget) {
         // Credentials only have to be non-blank - the repository is mocked, nothing connects.
         return new AppConfig("jdbc:unused-by-unit-test", "unused", "unused",
-                100, 2, 2, 4, shopEntryTarget, 2, 500, 0, true, "Плитка 1");
+                100, 2, 2, 4, shopEntryTarget, 2, 500, 0, true, false, "Плитка 1");
     }
 }

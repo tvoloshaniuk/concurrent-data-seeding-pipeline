@@ -41,7 +41,14 @@ public class EpicenterSeedingService {
                 seed(validator);
             }
             verifyItemTypeIsSearchable();
-            findAndLogTopShop("after indexes");
+            if (config.recreateIndexes()) {
+                dbRepository.runDdl(ResourceLoader.readText("drop_indexes.sql"));
+                findAndLogTopShop("without indexes");
+                dbRepository.runDdl(ResourceLoader.readText("post_load_indexes.sql"));
+                findAndLogTopShop("with indexes");
+            } else {
+                findAndLogTopShop("indexes untouched");
+            }
         }
     }
 
@@ -53,7 +60,7 @@ public class EpicenterSeedingService {
             log.info("recreate.schema=false and ShopEntry already holds data - skipping generation");
             return false;
         }
-        log.info("recreate.schema=false but ShopEntry is empty - seeding anyway"); //todo
+        log.info("recreate.schema=false but ShopEntry is empty - seeding anyway");
         return true;
     }
 
@@ -64,8 +71,6 @@ public class EpicenterSeedingService {
         CatalogDimensions dimensions = fillFoundationTables(validator);
         verifyItemTypeIsSearchable();
         fillShopEntryTable(dimensions, validator);
-
-        findAndLogTopShop("before indexes");
 
         // Create indexes after data population, not before -- to improve performance
         dbRepository.runDdl(ResourceLoader.readText("post_load_indexes.sql"));
@@ -93,7 +98,8 @@ public class EpicenterSeedingService {
         long startMillis = System.currentTimeMillis();
         new ProducerConsumerPipeline()
                 .execute(dbRepository, validator, config, dimensions);
-        log.info("ShopEntry generation+insertion took {} ms", System.currentTimeMillis() - startMillis);
+        log.info("ShopEntry generation & insertion in parallel pipeline took {} ms",
+                System.currentTimeMillis() - startMillis);
     }
 
     /**
