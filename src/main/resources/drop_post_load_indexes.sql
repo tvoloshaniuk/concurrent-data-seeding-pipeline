@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS idx_item_type_id;

@@ -12,8 +12,6 @@ import ua.shpp.utils.FoundationTablesPopulator;
 import ua.shpp.utils.ResourceLoader;
 
 import javax.sql.DataSource;
-import java.io.IOException;
-import java.io.InputStream;
 
 /**
  * Owns the whole seed-and-search flow: create schema, fill the four tables (Shop, ItemType,
@@ -30,6 +28,7 @@ public class EpicenterSeedingService {
         this(config, new DbRepository(initDatasource(config)));
     }
 
+    // Constructor for testing, so we can inject a mock DbRepository
     EpicenterSeedingService(AppConfig config, DbRepository dbRepository) {
         this.config = config;
         this.dbRepository = dbRepository;
@@ -37,34 +36,42 @@ public class EpicenterSeedingService {
 
     public void execute() throws InterruptedException {
         try (DtoValidator validator = new DtoValidator()) {
-            if (shouldSeed()) {
+            if (config.recreateSchema()) {
+                log.info("recreate.schema=true. Attempt to seed (with previous drop of all tables)...");
+                dbRepository.runDdl(ResourceLoader.readText("drop_all_tables.sql"));
                 seed(validator);
+                log.info("Seed completed");
             }
             verifyItemTypeIsSearchable();
-            findAndLogTopShop("after indexes");
+            if (config.recreateIndexes()) {
+                log.info("recreate.indexes=true. Attempt to create indexes...");
+                executeIndexesFlow();
+                log.info("Indexes created");
+            } else {
+                findAndLogTopShop("no info about indexes");
+            }
         }
     }
 
-    private boolean shouldSeed() {
-        if (config.recreateSchema()) {
-            return true;
-        }
-        if (dbRepository.hasShopEntries()) {
-            log.info("recreate.schema=false and ShopEntry already holds data - skipping generation");
-            return false;
-        }
-        log.info("recreate.schema=false but ShopEntry is empty - seeding anyway"); //todo
-        return true;
+    //Search top shop without index and with index to compare performance
+    private void executeIndexesFlow() {
+        dbRepository.runDdl(ResourceLoader.readText("drop_post_load_indexes.sql"));
+        findAndLogTopShop("without indexes");
+        dbRepository.runDdl(ResourceLoader.readText("post_load_indexes.sql"));
+        findAndLogTopShop("with indexes");
     }
 
-    //fill tables & create indexes
+    //fill tables
     private void seed(DtoValidator validator) throws InterruptedException {
-
+        dbRepository.runDdl(ResourceLoader.readText("schema.sql"));
+        CatalogDimensions dimensions = fillFoundationTables(validator);
+        fillShopEntryTable(dimensions, validator);
     }
 
     // Fills Shop, ItemType and Item - the three small/sequential tables ShopEntry depends on.
     private CatalogDimensions fillFoundationTables(DtoValidator validator) {
-        '
+
+        return null;
     }
 
     /**

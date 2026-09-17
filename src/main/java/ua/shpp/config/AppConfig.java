@@ -20,6 +20,7 @@ public record AppConfig(
         int maxStockQuantity,
         int invalidRatePercent,
         boolean recreateSchema,
+        boolean recreateIndexes,
         // Comes from args[0]:
         String itemType
 ) {
@@ -58,13 +59,14 @@ public record AppConfig(
                 requiredInt(properties, "max.stock.quantity"),
                 requiredInt(properties, "invalid.rate.percent"),
                 requiredBoolean(properties, "recreate.schema"),
+                requiredBoolean(properties, "recreate.indexes"),
                 requiredItemType(args)
         );
         log.info(
                 "Loaded config: dbUrl={}, dbUser={}, queueCapacity={}, producerThreadPoolSize={}, "
                         + "consumerThreadPoolSize={}, batchSize={}, itemType={}, shopEntryTarget={}, "
                         + "typeIncreaseCoefficient={}, maxStockQuantity={}, invalidRatePercent={}, "
-                        + "recreateSchema={}",
+                        + "recreateSchema={}, recreateIndexes={}",
                 config.dbUrl(),
                 config.dbUser(),
                 config.queueCapacity(),
@@ -76,7 +78,8 @@ public record AppConfig(
                 config.typeIncreaseCoefficient(),
                 config.maxStockQuantity(),
                 config.invalidRatePercent(),
-                config.recreateSchema()
+                config.recreateSchema(),
+                config.recreateIndexes()
         );
         return config;
     }
@@ -107,13 +110,6 @@ public record AppConfig(
         }
     }
 
-    /** todo
-     * Written by hand because the JDK offers nothing that fails on a bad boolean: parseBoolean and
-     * valueOf never throw, they just return false for "yes", "1" or a typo. There is therefore no
-     * exception to catch and no parser to delegate to - the only way to reject the value is to name
-     * the two strings that are allowed.
-     */
-    @SuppressWarnings("SameParameterValue")
     private static boolean requiredBoolean(Properties properties, String key) {
         String value = requiredString(properties, key);
         if ("true".equalsIgnoreCase(value)) {

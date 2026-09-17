@@ -48,3 +48,6 @@ config.properties
 .claude/
 .agents/
 .cursor/
+/src/main/resources/config(backup).properties
+/src/main/resources/config(backup).properties
+/src/main/resources/config(backup).properties
