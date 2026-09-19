@@ -5,7 +5,6 @@ import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
 
@@ -17,13 +16,13 @@ public class DbRepository {
         this.dataSource = dataSource;
     }
 
-    public void runDdl(String filename) {
+    public void runDdl(String sql) {
         try (
                 Connection connection = dataSource.getConnection();
                 Statement statement = connection.createStatement()
         ) {
-            log.debug("DDL statement {} execute", filename);
-            statement.execute(filename);
+            log.debug("DDL statement {} execute", sql);
+            statement.execute(sql);
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }

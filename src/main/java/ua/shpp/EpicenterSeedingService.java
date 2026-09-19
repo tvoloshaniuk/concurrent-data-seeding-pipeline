@@ -6,9 +6,7 @@ import org.slf4j.LoggerFactory;
 import ua.shpp.config.AppConfig;
 import ua.shpp.db.DbRepository;
 import ua.shpp.validation.DtoValidator;
-import ua.shpp.pipeline.ProducerConsumerPipeline;
 import ua.shpp.utils.CatalogDimensions;
-import ua.shpp.utils.FoundationTablesPopulator;
 import ua.shpp.utils.ResourceLoader;
 
 import javax.sql.DataSource;
@@ -41,25 +39,20 @@ public class EpicenterSeedingService {
                 dbRepository.runDdl(ResourceLoader.readText("drop_all_tables.sql"));
                 seed(validator);
                 log.info("Seed completed");
+
             }
             verifyItemTypeIsSearchable();
             if (config.recreateIndexes()) {
-                log.info("recreate.indexes=true. Attempt to create indexes...");
-                executeIndexesFlow();
+                dbRepository.runDdl(ResourceLoader.readText("drop_post_load_indexes.sql"));
+                log.info("Indexes dropped");
+                findAndLogTopShop();
+                dbRepository.runDdl(ResourceLoader.readText("post_load_indexes.sql"));
                 log.info("Indexes created");
-            } else {
-                findAndLogTopShop("no info about indexes");
             }
+            findAndLogTopShop();
         }
     }
 
-    //Search top shop without index and with index to compare performance
-    private void executeIndexesFlow() {
-        dbRepository.runDdl(ResourceLoader.readText("drop_post_load_indexes.sql"));
-        findAndLogTopShop("without indexes");
-        dbRepository.runDdl(ResourceLoader.readText("post_load_indexes.sql"));
-        findAndLogTopShop("with indexes");
-    }
 
     //fill tables
     private void seed(DtoValidator validator) throws InterruptedException {
@@ -89,7 +82,7 @@ public class EpicenterSeedingService {
 
     }
 
-    private void findAndLogTopShop(String phase) {
+    private void findAndLogTopShop() {
 
     }
 
