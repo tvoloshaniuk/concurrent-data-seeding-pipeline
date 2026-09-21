@@ -22,7 +22,6 @@ public final class ResourceLoader {
         return inputStream;
     }
 
-    //todo
     public static String readText(String fileName) {
         try (InputStream inputStream = stream(fileName)) {
             return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);

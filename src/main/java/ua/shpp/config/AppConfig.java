@@ -46,6 +46,11 @@ public record AppConfig(
     //loads from 2 sources: config.properties and args[0] (itemType) and returns AppConfig instance
     public static AppConfig load(String[] args) {
         Properties properties = ResourceLoader.readProperties("config.properties");
+        return load(properties, args);
+    }
+
+    //useful overloading layer for tests
+    static AppConfig load(Properties properties, String[] args) {
         AppConfig config = new AppConfig(
                 requiredString(properties, "db.url"),
                 requiredString(properties, "db.user"),
@@ -95,7 +100,7 @@ public record AppConfig(
     // Guarantees that such property exists before writing it into AppConfig record field
     private static String requiredString(Properties properties, String key) {
         String value = properties.getProperty(key);
-        if (value == null || value.isBlank()) {
+        if (value == null || value.isBlank()) {   //todo Q: чи не треба тут requireNotBlank задіяти? може для наглядності і зрозумілості краще залишити так, як є... або ще якихось best practices...
             throw new IllegalArgumentException("Missing property: " + key);
         }
         return value;
