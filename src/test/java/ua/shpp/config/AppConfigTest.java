@@ -109,12 +109,12 @@ class AppConfigTest {
             "TrUe, TRUE, true",
             "FALSE, fAlSe , false"
     })
-    void load_parsesBooleanPropertiesIgnoringCase(boolean recreateSchema, boolean recreateIndexes, boolean expectedValue) {
+    void load_parsesBooleanPropertiesIgnoringCase(String recreateSchema, String recreateIndexes, boolean expectedValue) {
         String[] args = {"TestItemType 1"};
         Properties properties = ResourceLoader.readProperties("config.properties");
-        properties.setProperty("recreate.schema", "TrUe");
-        properties.setProperty("recreate.indexes", "fAlSe");
-        AppConfig config = AppConfig.load(args);
+        properties.setProperty("recreate.schema", recreateSchema);
+        properties.setProperty("recreate.indexes", recreateIndexes);
+        AppConfig config = AppConfig.load(properties, args);
         assertEquals(config.recreateSchema(), expectedValue);
         assertEquals(config.recreateIndexes(), expectedValue);
 

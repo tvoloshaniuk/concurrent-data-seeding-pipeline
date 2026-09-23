@@ -5,9 +5,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ua.shpp.config.AppConfig;
 import ua.shpp.db.DbRepository;
-import ua.shpp.validation.DtoValidator;
 import ua.shpp.utils.CatalogDimensions;
+import ua.shpp.utils.FoundationTablesPopulator;
 import ua.shpp.utils.ResourceLoader;
+import ua.shpp.validation.DtoValidator;
 
 import javax.sql.DataSource;
 
@@ -63,7 +64,20 @@ public class EpicenterSeedingService {
 
     // Fills Shop, ItemType and Item - the three small/sequential tables ShopEntry depends on.
     private CatalogDimensions fillFoundationTables(DtoValidator validator) {
-
+        //fill shop
+        FoundationTablesPopulator populator = new FoundationTablesPopulator(dbRepository, validator);
+        populator.populate();
+        //todo
+        // while (CsvColumnReader.hasNextShop()) {
+        //     var shop = CsvColumnReader.readNextShop();
+        //     if (validator.isValid(shop)) {
+        //         dbRepository.insertShop(shop);
+        //     } else {
+        //         log.warn("Invalid shop: {}", shop);
+        //     }
+        // }
+        //fill itemType
+        //fill item
         return null;
     }
 
