@@ -7,6 +7,8 @@ import ua.shpp.config.AppConfig;
 import ua.shpp.db.DbRepository;
 import ua.shpp.utils.ResourceLoader;
 
+import java.io.IOException;
+
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.Mockito.*;
 
@@ -15,7 +17,7 @@ class EpicenterSeedingServiceTest {
 
     /* happy path */
     @Test
-    void execute_dropsTablesAndSeedsThem_whenRecreateSchemaTrue() throws InterruptedException {
+    void execute_dropsTablesAndSeedsThem_whenRecreateSchemaTrue() throws InterruptedException, IOException {
         new EpicenterSeedingService(config(true, false), dbRepository).execute();
         InOrder inOrder = inOrder(dbRepository);
         inOrder.verify(dbRepository).runDdl(ResourceLoader.readText("drop_all_tables.sql"));
@@ -24,7 +26,7 @@ class EpicenterSeedingServiceTest {
     }
 
     @Test
-    void execute_searchesBeforeAndAfterIndexRebuild_whenRecreateIndexesTrue() throws InterruptedException {
+    void execute_searchesBeforeAndAfterIndexRebuild_whenRecreateIndexesTrue() throws InterruptedException, IOException {
         new EpicenterSeedingService(config(false, true), dbRepository).execute();
         InOrder inOrder = inOrder(dbRepository);
         inOrder.verify(dbRepository).runDdl(ResourceLoader.readText("drop_post_load_indexes.sql"));
@@ -35,7 +37,7 @@ class EpicenterSeedingServiceTest {
 
     @Disabled("todo: DbRepository.findShopWithMaxItems not written yet")
     @Test
-    void execute_searchesTopShopOnce_whenRecreateIndexesFalse() throws InterruptedException {
+    void execute_searchesTopShopOnce_whenRecreateIndexesFalse() throws InterruptedException, IOException {
         new EpicenterSeedingService(config(false, false), dbRepository).execute();
         //todo verify(dbRepository, times(1)).findShopWithMaxItems("item type 1");
     }
@@ -43,7 +45,7 @@ class EpicenterSeedingServiceTest {
     /* edge cases, negative, etc */
 
     @Test
-    void execute_runsNoDdl_whenRecreateSchemaFalseAndRecreateIndexesFalse() throws InterruptedException {
+    void execute_runsNoDdl_whenRecreateSchemaFalseAndRecreateIndexesFalse() throws InterruptedException, IOException {
         new EpicenterSeedingService(config(false, false), dbRepository).execute();
         verify(dbRepository, never()).runDdl(anyString());
     }

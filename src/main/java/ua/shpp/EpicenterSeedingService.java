@@ -5,12 +5,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ua.shpp.config.AppConfig;
 import ua.shpp.db.DbRepository;
-import ua.shpp.utils.CatalogDimensions;
 import ua.shpp.utils.FoundationTablesPopulator;
 import ua.shpp.utils.ResourceLoader;
 import ua.shpp.validation.DtoValidator;
 
 import javax.sql.DataSource;
+import java.io.IOException;
+import java.io.InputStream;
 
 /**
  * Owns the whole seed-and-search flow: create schema, fill the four tables (Shop, ItemType,
@@ -33,7 +34,7 @@ public class EpicenterSeedingService {
         this.dbRepository = dbRepository;
     }
 
-    public void execute() throws InterruptedException {
+    public void execute() throws InterruptedException, IOException {
         try (DtoValidator validator = new DtoValidator()) {
             if (config.recreateSchema()) {
                 log.info("recreate.schema=true. Attempt to seed (with previous drop of all tables)...");
@@ -56,36 +57,30 @@ public class EpicenterSeedingService {
 
 
     //fill tables
-    private void seed(DtoValidator validator) throws InterruptedException {
+    private void seed(DtoValidator validator) throws InterruptedException, IOException {
         dbRepository.runDdl(ResourceLoader.readText("schema.sql"));
-        CatalogDimensions dimensions = fillFoundationTables(validator);
-        fillShopEntryTable(dimensions, validator);
+        fillFoundationTables(validator);
+        fillShopEntryTable(validator);
     }
 
     // Fills Shop, ItemType and Item - the three small/sequential tables ShopEntry depends on.
-    private CatalogDimensions fillFoundationTables(DtoValidator validator) {
-        //fill shop
-        FoundationTablesPopulator populator = new FoundationTablesPopulator(dbRepository, validator);
-        populator.populate();
-        //todo
-        // while (CsvColumnReader.hasNextShop()) {
-        //     var shop = CsvColumnReader.readNextShop();
-        //     if (validator.isValid(shop)) {
-        //         dbRepository.insertShop(shop);
-        //     } else {
-        //         log.warn("Invalid shop: {}", shop);
-        //     }
-        // }
-        //fill itemType
-        //fill item
-        return null;
+    private void fillFoundationTables(DtoValidator validator) throws IOException {
+        FoundationTablesPopulator populator = new FoundationTablesPopulator(dbRepository, config, validator);
+        try (
+                InputStream shopsCsvStream = ResourceLoader.stream("shops.csv");
+                InputStream itemTypesCsvStream = ResourceLoader.stream("item_types.csv")
+        ) {
+            populator.populate(shopsCsvStream, itemTypesCsvStream);
+        }
+
     }
 
     /**
      * Fills the final, largest table (ShopEntry, 3M+ rows) via the parallel pipeline.
      * Producer (generation) vs consumer (insertion).
      */
-    private void fillShopEntryTable(CatalogDimensions dimensions, DtoValidator validator) throws InterruptedException {
+
+    private void fillShopEntryTable(DtoValidator validator) throws InterruptedException {
 
     }
 
