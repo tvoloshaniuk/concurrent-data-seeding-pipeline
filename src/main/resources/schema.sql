@@ -1,3 +1,6 @@
+
+
+
 CREATE TABLE Shop
 (
     id   SERIAL PRIMARY KEY,

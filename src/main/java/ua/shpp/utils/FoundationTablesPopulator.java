@@ -7,12 +7,16 @@ import ua.shpp.db.DbRepository;
 import ua.shpp.dto.ItemDto;
 import ua.shpp.dto.ItemTypeDto;
 import ua.shpp.dto.ShopDto;
+import ua.shpp.generation.ItemGenerator;
 import ua.shpp.validation.DtoValidator;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
+
+import static java.lang.Math.ceilDiv;
 
 public class FoundationTablesPopulator {
     private static final Logger log = LoggerFactory.getLogger(FoundationTablesPopulator.class);
@@ -32,10 +36,10 @@ public class FoundationTablesPopulator {
         dbRepository.batchInsertShops(shopAddresses);
         // fill itemType
         List<ItemTypeDto> itemTypes = loadAndExpandItemTypes(itemTypesCsvStream);
-
         dbRepository.batchInsertItemTypes(itemTypes);
         // fill item
-        List<ItemDto> items = generateItems();
+        int itemCatalogSize = ceilDiv(config.shopEntryTarget(), itemTypes.size());
+        List<ItemDto> items = generateItems(itemCatalogSize, itemTypes.size());
         dbRepository.batchInsertItems(items);
     }
 
@@ -44,7 +48,12 @@ public class FoundationTablesPopulator {
                 .map(ShopDto::new)
                 .filter(validator::isValid)
                 .toList();
+        //todo if (itemTypes.isEmpty()) {
+        //    throw new IllegalStateException("No valid item types found");
+        // }
+        //todo + test for that
     }
+
 
     private List<ItemTypeDto> loadAndExpandItemTypes(InputStream itemTypesCsvStream) {
         List<String> baseNames = CsvColumnReader.readFirstColumn(itemTypesCsvStream);
@@ -65,20 +74,30 @@ public class FoundationTablesPopulator {
         if (validItemTypes.isEmpty()) {
             throw new IllegalStateException("item_types.csv contains no valid base categories");
         }
-        warnAboutDropped("item_types.csv", itemTypes.size(), validItemTypes.size());
+        warnAboutDropped(itemTypes.size(), validItemTypes.size());
 
         return validItemTypes;
     }
 
-    private void warnAboutDropped(String source, int read, int kept) {
+    private void warnAboutDropped(int read, int kept) {
         log.warn(
-                "{} was expanded to {} types, but after validation kept only {} of them. Others were filtered out"
-                , source, read, kept
+                "item_types.csv was expanded to {} types, but after validation kept only {} of them. Others were filtered out"
+                , read, kept
         );
     }
 
-    private List<ItemDto> generateItems() {
-        // todo
+    private List<ItemDto> generateItems(int itemCatalogSize, int typeCatalogSize) {
+        List<ItemDto> items = new ArrayList<>(itemCatalogSize);
+        int position = 1;
+        while (position <= itemCatalogSize) {
+            ItemDto item = new ItemDto(
+                    ItemGenerator.generateItemName(position, config.invalidRatePercent()),
+                    position <= typeCatalogSize ? position : 1 + ThreadLocalRandom.current().nextInt(typeCatalogSize)
+            );
+            items.add(item);
+            position++;
+            //todo Q: copilot autocomplete suggested this: items.size() % typeCatalogSize + 1
+        }
         return null;
     }
 
