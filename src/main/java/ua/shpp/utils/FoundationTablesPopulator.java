@@ -20,14 +20,17 @@ import static java.lang.Math.ceilDiv;
 
 public class FoundationTablesPopulator {
     private static final Logger log = LoggerFactory.getLogger(FoundationTablesPopulator.class);
+
     DbRepository dbRepository;
     AppConfig config;
     DtoValidator validator;
+    private final ItemGenerator itemGenerator;
 
     public FoundationTablesPopulator(DbRepository dbRepository, AppConfig config, DtoValidator validator) {
         this.dbRepository = dbRepository;
         this.config = config;
         this.validator = validator;
+        this.itemGenerator = new ItemGenerator(config.invalidRatePercent());
     }
 
     public void populate(InputStream shopsCsvStream, InputStream itemTypesCsvStream) throws IOException {
@@ -44,14 +47,14 @@ public class FoundationTablesPopulator {
     }
 
     private List<ShopDto> loadShopAddresses(InputStream shopsCsvStream) {
-        return CsvColumnReader.readFirstColumn(shopsCsvStream).stream()
+        List<ShopDto> shopAddresses = CsvColumnReader.readFirstColumn(shopsCsvStream).stream()
                 .map(ShopDto::new)
                 .filter(validator::isValid)
                 .toList();
-        //todo if (itemTypes.isEmpty()) {
-        //    throw new IllegalStateException("No valid item types found");
-        // }
-        //todo + test for that
+        if (shopAddresses.isEmpty()) {
+            throw new IllegalStateException("No valid shops found");
+        }
+        return shopAddresses;
     }
 
 
@@ -91,14 +94,14 @@ public class FoundationTablesPopulator {
         int position = 1;
         while (position <= itemCatalogSize) {
             ItemDto item = new ItemDto(
-                    ItemGenerator.generateItemName(position, config.invalidRatePercent()),
+                    itemGenerator.generateItemName(position),
                     position <= typeCatalogSize ? position : 1 + ThreadLocalRandom.current().nextInt(typeCatalogSize)
             );
             items.add(item);
             position++;
             //todo Q: copilot autocomplete suggested this: items.size() % typeCatalogSize + 1
         }
-        return null;
+        return items;
     }
 
 }
