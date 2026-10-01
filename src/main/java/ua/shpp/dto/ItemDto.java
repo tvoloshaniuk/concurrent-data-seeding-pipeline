@@ -8,7 +8,7 @@ import jakarta.validation.constraints.Size;
 public record ItemDto(
         @NotBlank
         @Size(min = 3)
-        @Pattern(regexp = "^\\p{Ll}")
+        @Pattern(regexp = "^\\p{Lu}.*")
         @Pattern(regexp = ".*[0-9]+.*")
         String name,
         @Positive int typeId

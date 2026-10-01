@@ -1,8 +1,13 @@
 package ua.shpp.validation;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import ua.shpp.dto.ItemDto;
+import ua.shpp.dto.ItemTypeDto;
 import ua.shpp.dto.ShopDto;
 import ua.shpp.dto.ShopEntryDto;
 
@@ -11,6 +16,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DtoValidatorTest {
     private final DtoValidator validator = new DtoValidator();
+
+    @AfterEach
+    void closeValidator() {
+        validator.close();
+    }
 
     /* ShopEntry */
     @ParameterizedTest
@@ -24,6 +34,7 @@ class DtoValidatorTest {
     void isValid_rejectsShopEntryOutsideAllowedRanges(int itemId, int shopId, int itemCount) {
         assertFalse(validator.isValid(new ShopEntryDto(itemId, shopId, itemCount)));
     }
+
     @ParameterizedTest
     @CsvSource({
             "1, 1, 0",
@@ -33,34 +44,32 @@ class DtoValidatorTest {
         assertTrue(validator.isValid(new ShopEntryDto(itemId, shopId, itemCount)));
     }
 
-    /* Shop */
+    /* DTO names */
     @ParameterizedTest
+    @NullSource // @NotBlank
     @ValueSource(strings = {
-            "", " ", "  ", "\t", "\n", //notBlank
-            "12", "a1", "!1", "?1", "@1", "#1", // Size < 3
-            "aaa1", "bbb1", "ccc1", "ddd1", // Pattern ^\p{Ll}
-            "Abc", "Def", "Ghi", "Jkl" // Pattern .*0-
-
+            "", // @NotBlank
+            " ", // @NotBlank
+            "A1", // @Size(min = 3)
+            "abc1", // @Pattern(regexp = "^\\p{Lu}.*")
+            "Abc" // @Pattern(regexp = ".*[0-9]+.*")
     })
-    void isValid_rejectsShopWithInvalidAddress(String missingKey) {
-        assertFalse(validator.isValid(new ShopDto(missingKey)));
-    }
-    @ParameterizedTest
-    @ValueSource(strings = {
-            "Abc-1", "Def0", "Ghi1", "Jkl2" // valid
-    })
-    void isValid_acceptsShopWithValidAddress(String validKey) {
-        assertTrue(validator.isValid(new ShopDto(validKey)));
+    void isValid_rejectsDtosWithInvalidName(String name) {
+        assertFalse(validator.isValid(new ShopDto(name)));
+        assertFalse(validator.isValid(new ItemTypeDto(name)));
+        assertFalse(validator.isValid(new ItemDto(name, 1)));
     }
 
+    @Test
+    void isValid_acceptsDtosWithValidNames() {
+        assertTrue(validator.isValid(new ShopDto("Київ 1")));
+        assertTrue(validator.isValid(new ItemTypeDto("Побутова техніка 1")));
+        assertTrue(validator.isValid(new ItemDto("Item 1", 1)));
+    }
 
-    /* ItemType */
-
-
-    /* Item */
-
-
-
-
-
+    @ParameterizedTest
+    @ValueSource(ints = {0, -1})
+    void isValid_rejectsItemWithNonPositiveTypeId(int typeId) {
+        assertFalse(validator.isValid(new ItemDto("Item 1", typeId)));
+    }
 }

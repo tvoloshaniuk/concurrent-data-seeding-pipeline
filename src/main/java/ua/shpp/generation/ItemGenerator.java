@@ -24,7 +24,7 @@ public class ItemGenerator {
         return switch (ThreadLocalRandom.current().nextInt(4)) {
             case 0 -> ""; // @NotBlank
             case 1 -> "I%d".formatted(position); // @Size(min = 3)
-            case 2 -> "invalid Item %d".formatted(position); // @Pattern(regexp = "^\\p{Ll}") - no leading capital
+            case 2 -> "invalid Item %d".formatted(position); // @Pattern(regexp = "^\\p{Lu}.*") - no leading capital
             case 3 -> "invalid Item"; // @Pattern(regexp = ".*[0-9]+.*") - no digits
             default -> throw new IllegalStateException();
         };
