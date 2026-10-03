@@ -65,12 +65,13 @@ public class EpicenterSeedingService {
 
     // Fills Shop, ItemType and Item - the three small/sequential tables ShopEntry depends on.
     private void fillFoundationTables(DtoValidator validator) throws IOException {
-        FoundationTablesPopulator populator = new FoundationTablesPopulator(dbRepository, config, validator);
+        FoundationTablesPopulator foundationTablesPopulator =
+                new FoundationTablesPopulator(dbRepository, config, validator);
         try (
                 InputStream shopsCsvStream = ResourceLoader.stream("shops.csv");
                 InputStream itemTypesCsvStream = ResourceLoader.stream("item_types.csv")
         ) {
-            populator.populate(shopsCsvStream, itemTypesCsvStream);
+            foundationTablesPopulator.populate(shopsCsvStream, itemTypesCsvStream);
         }
 
     }

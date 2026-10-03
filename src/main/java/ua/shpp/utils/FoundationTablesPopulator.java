@@ -41,7 +41,7 @@ public class FoundationTablesPopulator {
         List<ItemTypeDto> itemTypes = loadAndExpandItemTypes(itemTypesCsvStream);
         dbRepository.batchInsertItemTypes(itemTypes);
         // fill item
-        int itemCatalogSize = ceilDiv(config.shopEntryTarget(), itemTypes.size());
+        int itemCatalogSize = ceilDiv(config.shopEntryTarget(), shopAddresses.size());
         List<ItemDto> items = generateItems(itemCatalogSize, itemTypes.size());
         dbRepository.batchInsertItems(items);
     }
@@ -90,6 +90,13 @@ public class FoundationTablesPopulator {
     }
 
     private List<ItemDto> generateItems(int itemCatalogSize, int typeCatalogSize) {
+        if (itemCatalogSize <= 0) {
+            throw new IllegalStateException("itemCatalogSize must be positive");
+        }
+        if (typeCatalogSize > itemCatalogSize) {
+            throw new IllegalStateException("typeCatalogSize must not exceed itemCatalogSize");
+        }
+
         List<ItemDto> items = new ArrayList<>(itemCatalogSize);
         int position = 1;
         while (position <= itemCatalogSize) {
@@ -97,9 +104,12 @@ public class FoundationTablesPopulator {
                     itemGenerator.generateItemName(position),
                     position <= typeCatalogSize ? position : 1 + ThreadLocalRandom.current().nextInt(typeCatalogSize)
             );
-            items.add(item);
+            if (validator.isValid(item)) {
+                items.add(item);
+            } else {
+                log.warn("Generated invalid item: {}", item);
+            }
             position++;
-            //todo Q: copilot autocomplete suggested this: items.size() % typeCatalogSize + 1
         }
         return items;
     }

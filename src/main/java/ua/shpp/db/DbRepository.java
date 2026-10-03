@@ -40,6 +40,7 @@ public class DbRepository {
     }
 
     public void batchInsertItems(List<ItemDto> items) {
+
     }
 
     //todo Q: чи правильно що в main batchInsertShops та batchInsertItemTypes це окремі методи якщо наповнення в них однакове і можна декомпозувати в один?
