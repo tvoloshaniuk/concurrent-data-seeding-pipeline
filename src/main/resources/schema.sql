@@ -1,6 +1,3 @@
-
-
-
 CREATE TABLE Shop
 (
     id   SERIAL PRIMARY KEY,
@@ -16,8 +13,8 @@ CREATE TABLE ItemType
 CREATE TABLE Item
 (
     id      SERIAL PRIMARY KEY,
-    type_id INT  NOT NULL,
     name    TEXT NOT NULL UNIQUE,
+    type_id INT  NOT NULL,
     CONSTRAINT fk_item_type FOREIGN KEY (type_id) REFERENCES ItemType (id) ON DELETE CASCADE
 
 );

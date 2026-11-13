@@ -16,6 +16,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -41,7 +42,7 @@ class FoundationTablesPopulatorTest {
     /* populate Shop */
 
     @Test
-    void populate_passesExpectedShopsToRepository() throws IOException {
+    void populate_passesExpectedShopsToRepository() throws IOException, SQLException {
         DbRepository dbRepository = mock(DbRepository.class);
         AppConfig config = mock(AppConfig.class);
         when(config.shopEntryTarget()).thenReturn(9);
@@ -67,7 +68,7 @@ class FoundationTablesPopulatorTest {
     }
 
     @Test
-    void populate_usesOnlyValidShopsForInsertionAndItemCatalogSize() throws IOException {
+    void populate_usesOnlyValidShopsForInsertionAndItemCatalogSize() throws IOException, SQLException {
         DbRepository dbRepository = mock(DbRepository.class);
         AppConfig config = mock(AppConfig.class);
         when(config.shopEntryTarget()).thenReturn(12);
@@ -99,7 +100,7 @@ class FoundationTablesPopulatorTest {
     }
 
     @Test
-    void populate_throwsBeforeInsertingShopsWhenAllShopsAreInvalid() {
+    void populate_throwsBeforeInsertingShopsWhenAllShopsAreInvalid() throws SQLException {
         DbRepository dbRepository = mock(DbRepository.class);
         AppConfig config = mock(AppConfig.class);
         DtoValidator validator = new DtoValidator();
@@ -116,7 +117,7 @@ class FoundationTablesPopulatorTest {
 
     @ParameterizedTest
     @MethodSource("itemTypeInputs")
-    void populate_passesExpectedItemTypesToRepository(int coefficient, List<ItemTypeDto> expectedItemTypes) throws IOException {
+    void populate_passesExpectedItemTypesToRepository(int coefficient, List<ItemTypeDto> expectedItemTypes) throws IOException, SQLException {
         DbRepository dbRepository = mock(DbRepository.class);
         AppConfig config = mock(AppConfig.class);
         when(config.typeIncreaseCoefficient()).thenReturn(coefficient);
@@ -161,7 +162,7 @@ class FoundationTablesPopulatorTest {
     }
 
     @Test
-    void populate_insertsOnlyValidExpandedItemTypes() throws IOException {
+    void populate_insertsOnlyValidExpandedItemTypes() throws IOException, SQLException {
         DbRepository dbRepository = mock(DbRepository.class);
         AppConfig config = mock(AppConfig.class);
         when(config.typeIncreaseCoefficient()).thenReturn(1);
@@ -189,7 +190,7 @@ class FoundationTablesPopulatorTest {
     }
 
     @Test
-    void populate_throwsBeforeInsertingItemTypesWhenItemTypesCsvIsEmpty() {
+    void populate_throwsBeforeInsertingItemTypesWhenItemTypesCsvIsEmpty() throws SQLException {
         DbRepository dbRepository = mock(DbRepository.class);
         AppConfig config = mock(AppConfig.class);
         DtoValidator validator = new DtoValidator();
@@ -203,7 +204,7 @@ class FoundationTablesPopulatorTest {
     }
 
     @Test
-    void populate_throwsBeforeInsertingItemTypesWhenAllExpandedTypesAreInvalid() {
+    void populate_throwsBeforeInsertingItemTypesWhenAllExpandedTypesAreInvalid() throws SQLException {
         DbRepository dbRepository = mock(DbRepository.class);
         AppConfig config = mock(AppConfig.class);
         when(config.typeIncreaseCoefficient()).thenReturn(1);
@@ -220,7 +221,7 @@ class FoundationTablesPopulatorTest {
     /* populate Item */
 
     @Test
-    void populate_passesItemCountCalculatedFromValidShopsToRepository() throws IOException {
+    void populate_passesItemCountCalculatedFromValidShopsToRepository() throws IOException, SQLException {
         DbRepository dbRepository = mock(DbRepository.class);
         AppConfig config = mock(AppConfig.class);
         when(config.typeIncreaseCoefficient()).thenReturn(2);
@@ -249,7 +250,7 @@ class FoundationTablesPopulatorTest {
     }
 
     @Test
-    void populate_roundsUpItemCountWhenTargetNotDivisibleByShopCount() throws IOException {
+    void populate_roundsUpItemCountWhenTargetNotDivisibleByShopCount() throws IOException, SQLException {
         DbRepository dbRepository = mock(DbRepository.class);
         AppConfig config = mock(AppConfig.class);
         when(config.typeIncreaseCoefficient()).thenReturn(1);
@@ -269,7 +270,7 @@ class FoundationTablesPopulatorTest {
     }
 
     @Test
-    void populate_usesOnlyExistingTypesWhenItemsOutnumberTypes() throws IOException {
+    void populate_usesOnlyExistingTypesWhenItemsOutnumberTypes() throws IOException, SQLException {
         DbRepository dbRepository = mock(DbRepository.class);
         AppConfig config = mock(AppConfig.class);
         when(config.typeIncreaseCoefficient()).thenReturn(1);
@@ -310,7 +311,7 @@ class FoundationTablesPopulatorTest {
     }
 
     @Test
-    void populate_insertsOnlyItemsAcceptedByValidator() throws IOException {
+    void populate_insertsOnlyItemsAcceptedByValidator() throws IOException, SQLException {
         DbRepository dbRepository = mock(DbRepository.class);
         AppConfig config = mock(AppConfig.class);
         when(config.typeIncreaseCoefficient()).thenReturn(1);

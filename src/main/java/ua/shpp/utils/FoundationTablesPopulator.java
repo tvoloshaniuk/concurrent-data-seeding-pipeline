@@ -12,6 +12,7 @@ import ua.shpp.validation.DtoValidator;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
@@ -33,7 +34,7 @@ public class FoundationTablesPopulator {
         this.itemGenerator = new ItemGenerator(config.invalidRatePercent());
     }
 
-    public void populate(InputStream shopsCsvStream, InputStream itemTypesCsvStream) throws IOException {
+    public CatalogDimensions populate(InputStream shopsCsvStream, InputStream itemTypesCsvStream) throws IOException, SQLException {
         // fill shop
         List<ShopDto> shopAddresses = loadShopAddresses(shopsCsvStream);
         dbRepository.batchInsertShops(shopAddresses);
@@ -44,6 +45,9 @@ public class FoundationTablesPopulator {
         int itemCatalogSize = ceilDiv(config.shopEntryTarget(), shopAddresses.size());
         List<ItemDto> items = generateItems(itemCatalogSize, itemTypes.size());
         dbRepository.batchInsertItems(items);
+
+        //todo Q: is it ok to return dimensions here if  batchInsert could have filtered out some items? (ON CONFLICT DO NOTHING)
+        return new CatalogDimensions(shopAddresses.size(), items.size());
     }
 
     private List<ShopDto> loadShopAddresses(InputStream shopsCsvStream) {
@@ -89,6 +93,12 @@ public class FoundationTablesPopulator {
         );
     }
 
+    /**
+     * Generates items with random names and random type_id (1..typeCatalogSize)
+     * @param itemCatalogSize number of items to generate
+     * @param typeCatalogSize number of types to choose from
+     * @return list of generated items
+     */
     private List<ItemDto> generateItems(int itemCatalogSize, int typeCatalogSize) {
         if (itemCatalogSize <= 0) {
             throw new IllegalStateException("itemCatalogSize must be positive");

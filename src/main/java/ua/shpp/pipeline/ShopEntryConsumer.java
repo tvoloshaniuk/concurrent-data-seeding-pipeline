@@ -1,5 +1,15 @@
 package ua.shpp.pipeline;
 
-public class ShopEntryConsumer {
+import java.util.concurrent.Callable;
+
+public class ShopEntryConsumer implements Callable<Void> {
+    public ShopEntryConsumer () {
+
+    }
+    @Override
+    public Void call() throws Exception {
+
+        return null;
+    }
 
 }
