@@ -73,6 +73,7 @@ public class ShopEntryProducerSubtaskTest {
         int shopId = 2;
         List<ShopEntryDto> generatedEntries = List.of(
                 new ShopEntryDto(1, shopId, 1),
+                new ShopEntryDto(1, shopId, 1),
                 new ShopEntryDto(2, shopId, 1),
                 new ShopEntryDto(3, shopId, 1),
                 new ShopEntryDto(4, shopId, 1),

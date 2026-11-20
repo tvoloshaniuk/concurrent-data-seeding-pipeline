@@ -1,9 +1,11 @@
 package ua.shpp.pipeline;
 
+import ua.shpp.validation.DtoValidator;
+
 import java.util.concurrent.Callable;
 
 public class ShopEntryConsumer implements Callable<Void> {
-    public ShopEntryConsumer () {
+    public ShopEntryConsumer (DtoValidator validator) {
 
     }
     @Override

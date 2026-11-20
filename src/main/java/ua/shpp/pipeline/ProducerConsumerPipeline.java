@@ -15,7 +15,7 @@ public class ProducerConsumerPipeline {
 
     public static void execute(CatalogDimensions dimensions, DtoValidator validator, AppConfig config) {
         BlockingQueue<List<ShopEntryDto>> queue = new ArrayBlockingQueue(config.queueCapacity());
-        ShopEntryGenerator generator = new ShopEntryGenerator();
+        ShopEntryGenerator generator = new ShopEntryGenerator(config.invalidRatePercent(), config.maxStockQuantity());
 
         List<Future> producerFutures = new ArrayList<>();
         List<Future> consumerFutures = new ArrayList<>();
@@ -31,7 +31,7 @@ public class ProducerConsumerPipeline {
             }
 
             for (int i = 0; i < config.consumerThreadPoolSize(); i++) {
-                consumerFutures.add(consumerExecutor.submit(new ShopEntryConsumer()));
+                consumerFutures.add(consumerExecutor.submit(new ShopEntryConsumer(validator)));
             }
 
             //wait for producers to finish
